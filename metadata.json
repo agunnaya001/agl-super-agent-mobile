@@ -1,0 +1,6 @@
+{
+  "name": "AGL Super Agent",
+  "description": "AI-powered Web3 command center for Base blockchain, wallet analytics, smart contract intelligence, GameFi, and learning.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

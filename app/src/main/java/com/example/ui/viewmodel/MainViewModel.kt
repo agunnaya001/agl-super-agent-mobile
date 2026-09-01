@@ -1,0 +1,458 @@
+package com.example.ui.viewmodel
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.data.local.entities.ChatMessageEntity
+import com.example.data.local.entities.NotificationEntity
+import com.example.data.local.entities.RewardHistoryEntity
+import com.example.data.local.entities.UserProgressEntity
+import com.example.data.local.entities.WalletAccountEntity
+import com.example.data.model.AglEcosystemContract
+import com.example.data.model.AglEcosystemStats
+import com.example.data.model.BaseTransaction
+import com.example.data.model.LeaderboardTimeframe
+import com.example.data.model.LeaderboardUser
+import com.example.data.model.LearningLesson
+import com.example.data.model.PortfolioSummary
+import com.example.data.model.QuestCategory
+import com.example.data.model.QuestItem
+import com.example.data.model.SecurityRiskReport
+import com.example.data.model.SmartContractDetails
+import com.example.data.model.TokenAsset
+import com.example.data.model.UserProfile
+import com.example.data.remote.BlockchainService
+import com.example.data.remote.blockchain.services.LiveWalletState
+import com.example.data.repository.AppRepository
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+enum class AppScreen {
+    HOME,
+    WALLET,
+    AI_ASSISTANT,
+    QUESTS,
+    PROFILE
+}
+
+enum class AiSubTab {
+    CHAT,
+    CONTRACT_ANALYZER,
+    SECURITY_AUDIT
+}
+
+enum class QuestsSubTab {
+    MISSIONS,
+    LEARNING,
+    LEADERBOARD,
+    REWARDS
+}
+
+data class UiState(
+    val currentScreen: AppScreen = AppScreen.HOME,
+    val currentAiTab: AiSubTab = AiSubTab.CHAT,
+    val currentQuestsTab: QuestsSubTab = QuestsSubTab.MISSIONS,
+    val activeWalletAddress: String = BlockchainService.DEFAULT_DEMO_WALLET,
+    val isConnected: Boolean = true,
+    val liveWalletState: LiveWalletState? = null,
+    val isFetchingLiveBalances: Boolean = false,
+    val portfolioSummary: PortfolioSummary? = null,
+    val tokens: List<TokenAsset> = emptyList(),
+    val isRefreshing: Boolean = false,
+    val isAiThinking: Boolean = false,
+    val isAnalyzingContract: Boolean = false,
+    val isAuditingSecurity: Boolean = false,
+    val contractAnalysisResult: SmartContractDetails? = null,
+    val securityAuditResult: SecurityRiskReport? = null,
+    val ecosystemStats: AglEcosystemStats = AglEcosystemStats(),
+    val ecosystemContracts: List<AglEcosystemContract> = emptyList(),
+    val selectedTransaction: BaseTransaction? = null,
+    val selectedLesson: LearningLesson? = null,
+    val activeLeaderboardTimeframe: LeaderboardTimeframe = LeaderboardTimeframe.WEEKLY,
+    val leaderboardUsers: List<LeaderboardUser> = emptyList(),
+    val selectedQuestCategory: QuestCategory? = null,
+    val userProfile: UserProfile? = null,
+    val showAddWalletDialog: Boolean = false,
+    val showConnectWalletDialog: Boolean = false,
+    val showNotificationDialog: Boolean = false,
+    val showSettingsDialog: Boolean = false,
+    val showSecurityPrinciplesDialog: Boolean = false,
+    val snackbarMessage: String? = null
+)
+
+class MainViewModel(private val repository: AppRepository) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(UiState())
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    private val _events = MutableSharedFlow<String>()
+    val events: SharedFlow<String> = _events.asSharedFlow()
+
+    val wallets: StateFlow<List<WalletAccountEntity>> = repository.allWallets
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val transactions: StateFlow<List<BaseTransaction>> = repository.allTransactions
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val chatMessages: StateFlow<List<ChatMessageEntity>> = repository.chatMessages
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val quests: StateFlow<List<QuestItem>> = repository.allQuests
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val rewardsHistory: StateFlow<List<RewardHistoryEntity>> = repository.rewardsHistory
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val notifications: StateFlow<List<NotificationEntity>> = repository.notifications
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val userProgress: StateFlow<UserProgressEntity?> = repository.userProgress
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val allLessons: List<LearningLesson> = repository.getAllLessons()
+
+    init {
+        viewModelScope.launch {
+            repository.initializeSeedDataIfNeeded()
+            loadInitialData()
+        }
+    }
+
+    fun loadInitialData() {
+        viewModelScope.launch {
+            val walletAddr = repository.getActiveWalletAddress()
+            val liveState = repository.getLiveWalletState(walletAddr)
+            val tokens = repository.getWalletTokens(walletAddr)
+            val summary = repository.getPortfolioSummary(walletAddr)
+            val ecoStats = repository.getEcosystemStats()
+            val ecoContracts = repository.getEcosystemContracts()
+            val profile = repository.getUserProfile()
+            val leaderboard = repository.getLeaderboard(_uiState.value.activeLeaderboardTimeframe)
+
+            _uiState.update {
+                it.copy(
+                    activeWalletAddress = walletAddr,
+                    liveWalletState = liveState,
+                    tokens = tokens,
+                    portfolioSummary = summary,
+                    ecosystemStats = ecoStats,
+                    ecosystemContracts = ecoContracts,
+                    userProfile = profile,
+                    leaderboardUsers = leaderboard,
+                    isConnected = true
+                )
+            }
+        }
+    }
+
+    fun navigateToScreen(screen: AppScreen) {
+        _uiState.update { it.copy(currentScreen = screen) }
+    }
+
+    fun setAiSubTab(tab: AiSubTab) {
+        _uiState.update { it.copy(currentAiTab = tab) }
+    }
+
+    fun setQuestsSubTab(tab: QuestsSubTab) {
+        _uiState.update { it.copy(currentQuestsTab = tab) }
+    }
+
+    fun refreshData() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true, isFetchingLiveBalances = true) }
+            val walletAddr = repository.getActiveWalletAddress()
+            val liveState = repository.getLiveWalletState(walletAddr)
+            val tokens = repository.getWalletTokens(walletAddr)
+            val summary = repository.getPortfolioSummary(walletAddr)
+            val profile = repository.getUserProfile()
+            _uiState.update {
+                it.copy(
+                    tokens = tokens,
+                    liveWalletState = liveState,
+                    portfolioSummary = summary,
+                    userProfile = profile,
+                    isRefreshing = false,
+                    isFetchingLiveBalances = false
+                )
+            }
+            showSnackbar("Base on-chain balances updated: ${liveState.formattedAglBalance} AGL, ${liveState.formattedWAglBalance} wAGL")
+        }
+    }
+
+    fun connectWallet(address: String, label: String = "Connected Wallet") {
+        viewModelScope.launch {
+            val clean = address.trim()
+            if (!BlockchainService.walletService.isValidAddress(clean)) {
+                showSnackbar("Invalid EVM address. Please check and try again.")
+                return@launch
+            }
+
+            _uiState.update { it.copy(isFetchingLiveBalances = true) }
+            repository.addWatchWallet(clean, label)
+            repository.setActiveWalletAddress(clean)
+            val liveState = repository.getLiveWalletState(clean)
+            val tokens = repository.getWalletTokens(clean)
+            val summary = repository.getPortfolioSummary(clean)
+            val profile = repository.getUserProfile()
+
+            _uiState.update {
+                it.copy(
+                    activeWalletAddress = clean,
+                    liveWalletState = liveState,
+                    tokens = tokens,
+                    portfolioSummary = summary,
+                    userProfile = profile,
+                    isConnected = true,
+                    isFetchingLiveBalances = false,
+                    showConnectWalletDialog = false
+                )
+            }
+            showSnackbar("Connected wallet ${clean.take(6)}...${clean.takeLast(4)} on Base Mainnet")
+        }
+    }
+
+    fun disconnectWallet() {
+        viewModelScope.launch {
+            val demoAddr = BlockchainService.DEFAULT_DEMO_WALLET
+            repository.setActiveWalletAddress(demoAddr)
+            loadInitialData()
+            _uiState.update { it.copy(isConnected = false) }
+            showSnackbar("Disconnected wallet. Viewing Base Demo Mode.")
+        }
+    }
+
+    fun switchActiveWallet(address: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isFetchingLiveBalances = true) }
+            repository.setActiveWalletAddress(address)
+            val liveState = repository.getLiveWalletState(address)
+            val tokens = repository.getWalletTokens(address)
+            val summary = repository.getPortfolioSummary(address)
+            _uiState.update {
+                it.copy(
+                    activeWalletAddress = address,
+                    liveWalletState = liveState,
+                    tokens = tokens,
+                    portfolioSummary = summary,
+                    isConnected = true,
+                    isFetchingLiveBalances = false
+                )
+            }
+            showSnackbar("Switched active wallet to ${address.take(6)}...${address.takeLast(4)}")
+        }
+    }
+
+    fun addWatchWallet(address: String, label: String) {
+        viewModelScope.launch {
+            if (address.isBlank()) {
+                showSnackbar("Please enter a valid wallet address")
+                return@launch
+            }
+            repository.addWatchWallet(address, label)
+            repository.setActiveWalletAddress(address)
+            loadInitialData()
+            _uiState.update { it.copy(showAddWalletDialog = false) }
+            showSnackbar("Added watch-only wallet successfully")
+        }
+    }
+
+    fun sendChatMessage(text: String) {
+        if (text.isBlank()) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAiThinking = true) }
+            repository.sendChatMessage(text)
+            _uiState.update { it.copy(isAiThinking = false) }
+        }
+    }
+
+    fun clearChatHistory() {
+        viewModelScope.launch {
+            repository.clearChatHistory()
+            showSnackbar("Chat history cleared")
+        }
+    }
+
+    fun analyzeContract(address: String) {
+        if (address.isBlank()) {
+            showSnackbar("Please enter a valid contract address")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAnalyzingContract = true) }
+            try {
+                val details = repository.analyzeContract(address)
+                val profile = repository.getUserProfile()
+                _uiState.update {
+                    it.copy(
+                        contractAnalysisResult = details,
+                        isAnalyzingContract = false,
+                        userProfile = profile
+                    )
+                }
+                showSnackbar("Smart contract analysis completed (+50 XP)")
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isAnalyzingContract = false) }
+                showSnackbar("Analysis failed: ${e.message}")
+            }
+        }
+    }
+
+    fun auditSecurity(target: String) {
+        if (target.isBlank()) {
+            showSnackbar("Please enter an address or transaction hash")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAuditingSecurity = true) }
+            try {
+                val report = repository.auditSecurity(target)
+                val profile = repository.getUserProfile()
+                _uiState.update {
+                    it.copy(
+                        securityAuditResult = report,
+                        isAuditingSecurity = false,
+                        userProfile = profile
+                    )
+                }
+                showSnackbar("Web3 security audit completed (+75 XP)")
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isAuditingSecurity = false) }
+                showSnackbar("Audit failed: ${e.message}")
+            }
+        }
+    }
+
+    fun claimQuest(questId: String) {
+        viewModelScope.launch {
+            val success = repository.claimQuest(questId)
+            if (success) {
+                val profile = repository.getUserProfile()
+                _uiState.update { it.copy(userProfile = profile) }
+                showSnackbar("Quest bounty claimed successfully!")
+            } else {
+                showSnackbar("Quest criteria not yet completed or already claimed.")
+            }
+        }
+    }
+
+    fun claimDailyCheckIn() {
+        viewModelScope.launch {
+            val success = repository.claimDailyCheckIn()
+            if (success) {
+                val profile = repository.getUserProfile()
+                _uiState.update { it.copy(userProfile = profile) }
+                showSnackbar("Daily Check-In claimed! Streak extended.")
+            } else {
+                showSnackbar("Already checked in today. Come back tomorrow!")
+            }
+        }
+    }
+
+    fun selectLesson(lesson: LearningLesson?) {
+        _uiState.update { it.copy(selectedLesson = lesson) }
+    }
+
+    fun completeQuiz(lessonId: String, score: Int, total: Int) {
+        viewModelScope.launch {
+            val success = repository.completeLessonQuiz(lessonId, score, total)
+            if (success) {
+                val profile = repository.getUserProfile()
+                _uiState.update { it.copy(userProfile = profile) }
+                showSnackbar("Quiz completed! Earned XP and AGL bounty.")
+            }
+        }
+    }
+
+    fun selectLeaderboardTimeframe(timeframe: LeaderboardTimeframe) {
+        viewModelScope.launch {
+            val users = repository.getLeaderboard(timeframe)
+            _uiState.update {
+                it.copy(
+                    activeLeaderboardTimeframe = timeframe,
+                    leaderboardUsers = users
+                )
+            }
+        }
+    }
+
+    fun setSelectedTransaction(tx: BaseTransaction?) {
+        _uiState.update { it.copy(selectedTransaction = tx) }
+    }
+
+    fun setSelectedQuestCategory(category: QuestCategory?) {
+        _uiState.update { it.copy(selectedQuestCategory = category) }
+    }
+
+    fun setShowAddWalletDialog(show: Boolean) {
+        _uiState.update { it.copy(showAddWalletDialog = show) }
+    }
+
+    fun setShowConnectWalletDialog(show: Boolean) {
+        _uiState.update { it.copy(showConnectWalletDialog = show) }
+    }
+
+    fun fetchLiveBalances() {
+        refreshData()
+    }
+
+    fun setShowNotificationDialog(show: Boolean) {
+        _uiState.update { it.copy(showNotificationDialog = show) }
+    }
+
+    fun setShowSettingsDialog(show: Boolean) {
+        _uiState.update { it.copy(showSettingsDialog = show) }
+    }
+
+    fun setShowSecurityPrinciplesDialog(show: Boolean) {
+        _uiState.update { it.copy(showSecurityPrinciplesDialog = show) }
+    }
+
+    fun markNotificationRead(id: Long) {
+        viewModelScope.launch {
+            repository.markNotificationAsRead(id)
+        }
+    }
+
+    fun markAllNotificationsRead() {
+        viewModelScope.launch {
+            repository.markAllNotificationsAsRead()
+            showSnackbar("All notifications marked as read")
+        }
+    }
+
+    fun updateSettings(
+        preferredNetwork: String,
+        aiResponseStyle: String,
+        notifyTx: Boolean,
+        notifyRewards: Boolean,
+        notifyQuests: Boolean,
+        notifySecurity: Boolean
+    ) {
+        viewModelScope.launch {
+            repository.updateSettings(
+                preferredNetwork,
+                aiResponseStyle,
+                notifyTx,
+                notifyRewards,
+                notifyQuests,
+                notifySecurity
+            )
+            showSnackbar("Preferences saved successfully")
+        }
+    }
+
+    fun showSnackbar(message: String) {
+        _uiState.update { it.copy(snackbarMessage = message) }
+    }
+
+    fun clearSnackbar() {
+        _uiState.update { it.copy(snackbarMessage = null) }
+    }
+}
