@@ -84,6 +84,7 @@ import com.example.data.model.TransactionType
 import com.example.data.remote.blockchain.config.BaseBlockchainConfig
 import com.example.data.remote.blockchain.services.LiveWalletState
 import com.example.ui.components.GlassCard
+import com.example.ui.components.RecentTransactionsComponent
 import com.example.ui.components.TokenRow
 import com.example.ui.components.TransactionRow
 import com.example.ui.theme.BaseBlue
@@ -117,6 +118,9 @@ fun WalletScreen(
     onSelectTransaction: (BaseTransaction) -> Unit,
     onExplainTxWithAi: (BaseTransaction) -> Unit,
     onShowSnackbar: (String) -> Unit,
+    isIndexingTransactions: Boolean = false,
+    indexerStatus: String = "Live Basescan Indexer",
+    onRefreshTransactions: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
@@ -284,102 +288,20 @@ fun WalletScreen(
             }
 
             2 -> {
-                // Transactions list with filter chips
+                // Real-time on-chain indexed transactions feed with AI-generated human-readable summaries
                 item {
-                    Column {
-                        Text(
-                            text = "Filter Base Activity",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            item {
-                                FilterChip(
-                                    selected = selectedTxFilter == null,
-                                    onClick = { selectedTxFilter = null },
-                                    label = { Text("All") },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = BaseBlue,
-                                        selectedLabelColor = Color.White
-                                    )
-                                )
-                            }
-                            item {
-                                FilterChip(
-                                    selected = selectedTxFilter == TransactionType.STAKE_AGL,
-                                    onClick = { selectedTxFilter = TransactionType.STAKE_AGL },
-                                    label = { Text("Staking") },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = BaseBlue,
-                                        selectedLabelColor = Color.White
-                                    )
-                                )
-                            }
-                            item {
-                                FilterChip(
-                                    selected = selectedTxFilter == TransactionType.CLAIM_REWARD,
-                                    onClick = { selectedTxFilter = TransactionType.CLAIM_REWARD },
-                                    label = { Text("Rewards") },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = BaseBlue,
-                                        selectedLabelColor = Color.White
-                                    )
-                                )
-                            }
-                            item {
-                                FilterChip(
-                                    selected = selectedTxFilter == TransactionType.SWAP,
-                                    onClick = { selectedTxFilter = TransactionType.SWAP },
-                                    label = { Text("Swaps") },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = BaseBlue,
-                                        selectedLabelColor = Color.White
-                                    )
-                                )
-                            }
-                            item {
-                                FilterChip(
-                                    selected = selectedTxFilter == TransactionType.TRANSFER_IN || selectedTxFilter == TransactionType.TRANSFER_OUT,
-                                    onClick = { selectedTxFilter = TransactionType.TRANSFER_IN },
-                                    label = { Text("Transfers") },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = BaseBlue,
-                                        selectedLabelColor = Color.White
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (filteredTransactions.isEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(DarkCard)
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No transactions found for this filter.",
-                                color = TextSecondary,
-                                fontSize = 13.sp
-                            )
-                        }
-                    }
-                } else {
-                    items(filteredTransactions) { tx ->
-                        TransactionRow(
-                            transaction = tx,
-                            onClick = { onSelectTransaction(tx) }
-                        )
-                    }
+                    RecentTransactionsComponent(
+                        transactions = transactions,
+                        isLoading = isIndexingTransactions,
+                        indexerStatus = indexerStatus,
+                        onRefresh = onRefreshTransactions,
+                        onSelectTransaction = onSelectTransaction,
+                        onExplainWithAi = onExplainTxWithAi,
+                        onShowSnackbar = onShowSnackbar,
+                        maxDisplayCount = 30,
+                        showFilterChips = true,
+                        showViewAllButton = false
+                    )
                 }
             }
 
@@ -994,14 +916,14 @@ fun BrandingKitSection(
                                 .padding(vertical = 4.dp)
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(DarkBackground)
-                                .clickable { onCopyContract(contract.address, contract.name) }
+                                .clickable { onCopyContract(contract.contractAddress, contract.name) }
                                 .padding(horizontal = 8.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
                                 Text(contract.name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                Text("${contract.address.take(10)}...${contract.address.takeLast(6)}", fontSize = 10.sp, color = TextMuted)
+                                Text("${contract.contractAddress.take(10)}...${contract.contractAddress.takeLast(6)}", fontSize = 10.sp, color = TextMuted)
                             }
                             Text("Copy", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = BaseCyan)
                         }

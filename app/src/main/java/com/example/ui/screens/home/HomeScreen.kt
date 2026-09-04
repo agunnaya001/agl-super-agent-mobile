@@ -49,10 +49,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.AglEcosystemContract
 import com.example.data.model.AglEcosystemStats
+import com.example.data.model.AiSuggestion
+import com.example.data.model.AiSuggestionCategory
 import com.example.data.model.BaseTransaction
 import com.example.data.model.PortfolioSummary
 import com.example.data.model.QuestItem
+import com.example.ui.components.AiSuggestionsSection
 import com.example.ui.components.GlassCard
+import com.example.ui.components.RecentTransactionsComponent
 import com.example.ui.components.StatCard
 import com.example.ui.components.TransactionRow
 import com.example.ui.components.Web3PortfolioChart
@@ -84,6 +88,16 @@ fun HomeScreen(
     onSelectTransaction: (BaseTransaction) -> Unit,
     onClaimQuest: (String) -> Unit,
     onDailyCheckIn: () -> Unit,
+    aiSuggestions: List<AiSuggestion> = emptyList(),
+    selectedAiCategory: AiSuggestionCategory = AiSuggestionCategory.ALL,
+    isRefreshingSuggestions: Boolean = false,
+    onSelectAiCategory: (AiSuggestionCategory) -> Unit = {},
+    onRefreshSuggestions: () -> Unit = {},
+    onApplySuggestion: (AiSuggestion) -> Unit = {},
+    isIndexingTransactions: Boolean = false,
+    indexerStatus: String = "Live Basescan Indexer",
+    onRefreshTransactions: () -> Unit = {},
+    onShowSnackbar: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -130,6 +144,18 @@ fun HomeScreen(
         }
 
         item {
+            // AI Suggestions & Real-Time Intelligence
+            AiSuggestionsSection(
+                suggestions = aiSuggestions,
+                selectedCategory = selectedAiCategory,
+                isRefreshing = isRefreshingSuggestions,
+                onSelectCategory = onSelectAiCategory,
+                onRefresh = onRefreshSuggestions,
+                onApplySuggestion = onApplySuggestion
+            )
+        }
+
+        item {
             // AGL Ecosystem Live Intelligence Banner
             AglEcosystemBanner(
                 stats = ecosystemStats,
@@ -154,16 +180,23 @@ fun HomeScreen(
         }
 
         item {
-            // Recent Base On-Chain Transactions Feed
-            RecentTransactionsSection(
-                transactions = transactions.take(4),
+            // Real-Time On-Chain Recent Transactions Feed with AI Summaries
+            RecentTransactionsComponent(
+                transactions = transactions,
+                isLoading = isIndexingTransactions,
+                indexerStatus = indexerStatus,
+                onRefresh = onRefreshTransactions,
                 onSelectTransaction = onSelectTransaction,
-                onViewAll = { onNavigate(AppScreen.WALLET) },
                 onExplainWithAi = { tx ->
                     onSelectTransaction(tx)
                     onNavigateAiTab(AiSubTab.CHAT)
                     onNavigate(AppScreen.AI_ASSISTANT)
-                }
+                },
+                onShowSnackbar = onShowSnackbar,
+                maxDisplayCount = 5,
+                showFilterChips = true,
+                showViewAllButton = true,
+                onViewAllClick = { onNavigate(AppScreen.WALLET) }
             )
         }
 
@@ -595,7 +628,7 @@ fun QuestItemRow(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 LinearProgressIndicator(
-                    progress = quest.progressFraction,
+                    progress = { quest.progressFraction },
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
                         .height(4.dp)

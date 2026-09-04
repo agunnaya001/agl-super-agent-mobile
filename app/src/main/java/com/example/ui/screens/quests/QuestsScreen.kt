@@ -34,6 +34,7 @@ import com.example.data.model.LearningLesson
 import com.example.data.model.QuestCategory
 import com.example.data.model.QuestItem
 import com.example.data.model.UserProfile
+import com.example.ui.components.QuestsXpProgressBadgeComponent
 import com.example.ui.screens.home.QuestItemRow
 import com.example.ui.theme.BaseBlue
 import com.example.ui.theme.BaseCyan
@@ -63,6 +64,7 @@ fun QuestsScreen(
     userProfile: UserProfile?,
     rewardsHistory: List<RewardHistoryEntity>,
     onDailyCheckIn: () -> Unit,
+    onShowSnackbar: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -76,7 +78,7 @@ fun QuestsScreen(
             containerColor = DarkNav,
             contentColor = BaseCyan,
             indicator = { tabPositions ->
-                TabRowDefaults.Indicator(
+                TabRowDefaults.SecondaryIndicator(
                     modifier = Modifier.tabIndicatorOffset(tabPositions[currentSubTab.ordinal]),
                     color = BaseCyan,
                     height = 3.dp
@@ -142,7 +144,10 @@ fun QuestsScreen(
                     quests = quests,
                     selectedCategory = selectedCategory,
                     onSelectCategory = onSelectCategory,
-                    onClaimQuest = onClaimQuest
+                    onClaimQuest = onClaimQuest,
+                    userProfile = userProfile,
+                    onNavigateToLearn = { onSubTabSelected(QuestsSubTab.LEARNING) },
+                    onShowSnackbar = onShowSnackbar
                 )
             }
             QuestsSubTab.LEARNING -> {
@@ -175,7 +180,10 @@ fun MissionsListContent(
     quests: List<QuestItem>,
     selectedCategory: QuestCategory?,
     onSelectCategory: (QuestCategory?) -> Unit,
-    onClaimQuest: (String) -> Unit
+    onClaimQuest: (String) -> Unit,
+    userProfile: UserProfile? = null,
+    onNavigateToLearn: () -> Unit = {},
+    onShowSnackbar: (String) -> Unit = {}
 ) {
     val filteredQuests = if (selectedCategory == null) {
         quests
@@ -190,7 +198,17 @@ fun MissionsListContent(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
+            // Visual Progress Bar & Badge Display Component for XP Accumulation and Upcoming Reward Milestones
+            QuestsXpProgressBadgeComponent(
+                userProfile = userProfile,
+                onNavigateToLearn = onNavigateToLearn,
+                onShowSnackbar = onShowSnackbar
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        item {
             Text(
                 text = "Super Agent Missions",
                 fontSize = 18.sp,

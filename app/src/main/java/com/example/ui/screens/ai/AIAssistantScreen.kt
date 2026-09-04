@@ -21,12 +21,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -52,8 +54,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.entities.ChatMessageEntity
+import com.example.data.model.AiSuggestion
+import com.example.data.model.AiSuggestionCategory
 import com.example.data.model.SecurityRiskReport
 import com.example.data.model.SmartContractDetails
+import com.example.ui.components.AiFollowUpSuggestionsRow
 import com.example.ui.theme.BaseBlue
 import com.example.ui.theme.BaseCyan
 import com.example.ui.theme.DarkBackground
@@ -84,6 +89,11 @@ fun AIAssistantScreen(
     securityReport: SecurityRiskReport?,
     isAuditingSecurity: Boolean,
     onAuditSecurity: (String) -> Unit,
+    suggestions: List<AiSuggestion> = emptyList(),
+    selectedSuggestionCategory: AiSuggestionCategory = AiSuggestionCategory.ALL,
+    onSelectSuggestionCategory: (AiSuggestionCategory) -> Unit = {},
+    followUpSuggestions: List<String> = emptyList(),
+    onApplySuggestion: (AiSuggestion) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -97,7 +107,7 @@ fun AIAssistantScreen(
             containerColor = DarkNav,
             contentColor = BaseCyan,
             indicator = { tabPositions ->
-                TabRowDefaults.Indicator(
+                TabRowDefaults.SecondaryIndicator(
                     modifier = Modifier.tabIndicatorOffset(tabPositions[currentTab.ordinal]),
                     color = BaseCyan,
                     height = 3.dp
@@ -149,7 +159,12 @@ fun AIAssistantScreen(
                     messages = messages,
                     isThinking = isThinking,
                     onSendMessage = onSendMessage,
-                    onClearChat = onClearChat
+                    onClearChat = onClearChat,
+                    suggestions = suggestions,
+                    selectedCategory = selectedSuggestionCategory,
+                    onSelectCategory = onSelectSuggestionCategory,
+                    followUpSuggestions = followUpSuggestions,
+                    onApplySuggestion = onApplySuggestion
                 )
             }
             AiSubTab.CONTRACT_ANALYZER -> {
@@ -175,16 +190,27 @@ fun AIChatContent(
     messages: List<ChatMessageEntity>,
     isThinking: Boolean,
     onSendMessage: (String) -> Unit,
-    onClearChat: () -> Unit
+    onClearChat: () -> Unit,
+    suggestions: List<AiSuggestion> = emptyList(),
+    selectedCategory: AiSuggestionCategory = AiSuggestionCategory.ALL,
+    onSelectCategory: (AiSuggestionCategory) -> Unit = {},
+    followUpSuggestions: List<String> = emptyList(),
+    onApplySuggestion: (AiSuggestion) -> Unit = {}
 ) {
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    val promptSuggestions = listOf(
-        "Show my AGL balance",
+    val filteredSuggestions = if (selectedCategory == AiSuggestionCategory.ALL) {
+        suggestions
+    } else {
+        suggestions.filter { it.category == selectedCategory }
+    }
+
+    val fallbackSuggestions = listOf(
+        "What is my current AGL balance?",
+        "Show my real-time balances",
+        "What is my voting power in wAGL?",
         "Explain my last Base transaction",
-        "How much have I earned in rewards?",
-        "What does this smart contract do?",
         "Explain Base L2 gas in simple terms",
         "Audit wallet security risks"
     )
@@ -226,7 +252,7 @@ fun AIChatContent(
 
             IconButton(
                 onClick = onClearChat,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(32.dp).testTag("clear_chat_button")
             ) {
                 Icon(
                     imageVector = Icons.Default.DeleteOutline,
@@ -274,31 +300,120 @@ fun AIChatContent(
                     }
                 }
             }
+
+            // Inline Follow-up suggestion row right in the chat stream
+            if (followUpSuggestions.isNotEmpty() && !isThinking) {
+                item {
+                    AiFollowUpSuggestionsRow(
+                        followUps = followUpSuggestions,
+                        onSelectFollowUp = { prompt ->
+                            onSendMessage(prompt)
+                        }
+                    )
+                }
+            }
         }
 
-        // Prompt Chips carousel
+        // AI Suggestion category chips bar
         Spacer(modifier = Modifier.height(6.dp))
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+        ) {
+            items(AiSuggestionCategory.entries) { cat ->
+                val isSelected = cat == selectedCategory
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onSelectCategory(cat) },
+                    label = {
+                        Text(
+                            text = "${cat.emoji} ${cat.label}",
+                            fontSize = 10.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = BaseCyan.copy(alpha = 0.2f),
+                        selectedLabelColor = BaseCyan,
+                        containerColor = DarkCardElevated,
+                        labelColor = TextSecondary
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = isSelected,
+                        selectedBorderColor = BaseCyan,
+                        borderColor = DarkBorder,
+                        borderWidth = 1.dp,
+                        selectedBorderWidth = 1.dp
+                    ),
+                    modifier = Modifier.height(28.dp)
+                )
+            }
+        }
+
+        // Suggestion prompt chips
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(vertical = 4.dp)
         ) {
-            items(promptSuggestions) { prompt ->
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(DarkCardElevated)
-                        .border(1.dp, DarkBorder, RoundedCornerShape(16.dp))
-                        .clickable {
-                            onSendMessage(prompt)
+            if (filteredSuggestions.isNotEmpty()) {
+                items(filteredSuggestions) { suggestion ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(DarkCardElevated)
+                            .border(1.dp, BaseCyan.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+                            .clickable {
+                                onApplySuggestion(suggestion)
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .testTag("ai_suggestion_chip_${suggestion.id}")
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "${suggestion.icon} ${suggestion.title}",
+                                fontSize = 11.sp,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Medium
+                            )
+                            suggestion.impactTag?.let { tag ->
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(BaseCyan.copy(alpha = 0.15f))
+                                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = tag,
+                                        fontSize = 9.sp,
+                                        color = BaseCyan,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                         }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = prompt,
-                        fontSize = 11.sp,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Medium
-                    )
+                    }
+                }
+            } else {
+                items(fallbackSuggestions) { prompt ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(DarkCardElevated)
+                            .border(1.dp, DarkBorder, RoundedCornerShape(16.dp))
+                            .clickable {
+                                onSendMessage(prompt)
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = prompt,
+                            fontSize = 11.sp,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
@@ -352,7 +467,7 @@ fun AIChatContent(
                     .testTag("send_chat_button")
             ) {
                 Icon(
-                    imageVector = Icons.Default.Send,
+                    imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Send",
                     tint = Color.White,
                     modifier = Modifier.size(20.dp)

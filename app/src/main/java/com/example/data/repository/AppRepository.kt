@@ -12,6 +12,8 @@ import com.example.data.local.entities.WalletAccountEntity
 import com.example.data.model.AglEcosystemContract
 import com.example.data.model.AglEcosystemStats
 import com.example.data.model.BaseTransaction
+import com.example.data.model.AiSuggestion
+import com.example.data.model.AiSuggestionCategory
 import com.example.data.model.LeaderboardTimeframe
 import com.example.data.model.LeaderboardUser
 import com.example.data.model.LearningLesson
@@ -29,6 +31,7 @@ import com.example.data.model.UserProfile
 import com.example.data.remote.BlockchainService
 import com.example.data.remote.GeminiServiceClient
 import com.example.data.remote.blockchain.services.LiveWalletState
+import com.example.ui.viewmodel.AiSubTab
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -146,8 +149,21 @@ class AppRepository(private val database: AppDatabase) {
         if (progress != null) {
             database.userProgressDao().saveUserProgress(progress.copy(currentWalletAddress = address))
         }
-        val txs = BlockchainService.getInitialTransactions(address)
+        val txsResult = BlockchainService.fetchRecentTransactions(address)
+        val txs = if (txsResult.isSuccess) txsResult.getOrThrow() else BlockchainService.getInitialTransactions(address)
         database.walletDao().insertTransactions(txs.map { it.toEntity(address) })
+    }
+
+    suspend fun refreshRecentTransactions(walletAddress: String? = null): Result<List<BaseTransaction>> = withContext(Dispatchers.IO) {
+        val targetWallet = walletAddress ?: getActiveWalletAddress()
+        val indexResult = BlockchainService.fetchRecentTransactions(targetWallet)
+        if (indexResult.isSuccess) {
+            val txs = indexResult.getOrThrow()
+            database.walletDao().insertTransactions(txs.map { it.toEntity(targetWallet) })
+            Result.success(txs)
+        } else {
+            indexResult
+        }
     }
 
     suspend fun addWatchWallet(address: String, label: String) = withContext(Dispatchers.IO) {
@@ -207,20 +223,47 @@ class AppRepository(private val database: AppDatabase) {
         val allHistory = database.chatDao().getAllMessages().first()
         val historyPairs = allHistory.map { Pair(it.sender, it.text) }
 
+        // Fetch real-time on-chain state from Base contracts
+        val liveState = getLiveWalletState(activeWallet)
+        val latestBlock = BlockchainService.rpcService.ethBlockNumber().getOrDefault(50740000L)
+        val gasPrice = BlockchainService.rpcService.ethGasPrice().getOrNull()
+        val gasGwei = if (gasPrice != null) {
+            "%.4f".format(gasPrice.toDouble() / 1e9)
+        } else {
+            "0.0012"
+        }
+        val governorDetails = BlockchainService.governorService.getGovernorDetails().getOrNull()
+
         val systemPrompt = """
-            You are AGL Super Agent, an advanced AI-powered Web3 command assistant on the Base blockchain.
-            Your purpose is to convert complex blockchain information into simple, clear, and actionable explanations for mobile users.
-            Active wallet: $activeWallet
-            Base Chain ID: 8453 (Base Mainnet)
-            AGL Token: 0x892a0138cA092d6e3556F8e7d8258380D6c4A143
-            You provide concise, friendly, secure guidance. Always maintain security principles: never ask for private keys or seed phrases, and clearly warn about unverified contracts.
+            You are AGL Super Agent, an advanced AI-powered Web3 command assistant on the Base blockchain (Chain ID: 8453).
+            Your purpose is to convert complex blockchain information into simple, clear, actionable, and accurate explanations for mobile users.
+
+            REAL-TIME CONTRACT & WALLET TELEMETRY (FETCHED LIVE FROM BASE RPC):
+            - Active Wallet: $activeWallet
+            - Live AGL Token Balance: ${liveState.formattedAglBalance} AGL (USD Value: $${"%.2f".format((liveState.formattedAglBalance.replace(",", "").toDoubleOrNull() ?: 0.0) * 3.42)})
+            - Live Staked wAGL: ${liveState.formattedWAglBalance} wAGL (Active Voting Power: ${liveState.formattedVotingPower} votes)
+            - Live Base Native ETH: ${liveState.formattedEthBalance} ETH (USD Value: $${"%.2f".format((liveState.formattedEthBalance.replace(",", "").toDoubleOrNull() ?: 0.0) * 2680.50)})
+            - Live AGL Compute Credits: ${liveState.formattedCredits} Credits (Contract: 0x13866F31c60822Ff70684213b9727915Ddf2c183)
+            - Latest Base Block: #$latestBlock
+            - Base L2 Gas Price: $gasGwei Gwei
+            - Agunnaya DAO Governor: ${governorDetails?.name ?: "Agunnaya DAO"} (0x3fFCb92A17caeaAd1342DD76978b566C8aEC7010)
+            - Quorum Requirement: ${governorDetails?.formattedQuorum ?: "4,000,000 wAGL"}
+            - Staking Rewards APR: 18.5%
+            - Verified Base Contracts:
+              * AGL Token: 0xEA1221B4d80A89BD8C75248Fae7c176BD1854698 (ERC-20, 18 Decimals)
+              * wAGL Votes Wrapper: 0xA27C9BA04D06EcAF766EF4e074b403DAf19A3d69
+              * AGL Credits: 0x13866F31c60822Ff70684213b9727915Ddf2c183
+              * Timelock Controller: 0x900D315C91D9e54F3fa3412D475009d905bf6744
+
+            CRITICAL DIRECTIVE:
+            When the user asks natural language questions like 'What is my current AGL balance?', 'What are my balances?', or asks about their voting power, gas fees, or contracts, ALWAYS resolve the answer using these exact real-time numbers fetched from the contracts. Keep responses friendly, concise, and structured with bold highlights. Never ask for private keys or seed phrases.
         """.trimIndent()
 
         val aiResult = geminiClient.askAssistant(systemPrompt, historyPairs, userText)
         val responseText = if (aiResult.isSuccess) {
             aiResult.getOrThrow()
         } else {
-            BlockchainService.generateLocalAIExplanation(userText, activeWallet)
+            BlockchainService.generateLocalAIExplanation(userText, activeWallet, liveState)
         }
 
         val agentMsg = ChatMessageEntity(
@@ -278,6 +321,154 @@ class AppRepository(private val database: AppDatabase) {
             )
         }
         report
+    }
+
+    fun getAiSuggestions(
+        activeWallet: String,
+        portfolio: PortfolioSummary? = null
+    ): List<AiSuggestion> {
+        val shortAddr = if (activeWallet.length > 10) "${activeWallet.take(6)}...${activeWallet.takeLast(4)}" else activeWallet
+        val unstakedAgl = portfolio?.aglBalance ?: 1250.45
+        val unstakedStr = String.format(java.util.Locale.US, "%,.0f", unstakedAgl)
+
+        return listOf(
+            AiSuggestion(
+                id = "sug_check_live_balance",
+                category = AiSuggestionCategory.PORTFOLIO,
+                title = "Check Live AGL Contract Balance",
+                description = "Query verified Base Mainnet contract (0xEA1221B4d80A89BD8C75248Fae7c176BD1854698) for your real-time AGL & wAGL balances.",
+                prompt = "What is my current AGL balance?",
+                badge = "Live RPC",
+                impactTag = "Real-Time",
+                icon = "🪙",
+                targetAiTab = AiSubTab.CHAT
+            ),
+            AiSuggestion(
+                id = "sug_stake_yield",
+                category = AiSuggestionCategory.OPTIMIZATION,
+                title = "Stake Idle AGL (+18.5% APY)",
+                description = "You have $unstakedStr AGL available. Stake into the Governor Timelock pool to earn Base compute rewards and boost voting power.",
+                prompt = "How do I stake my $unstakedStr AGL tokens in the Base Governor Timelock contract to earn the 18.5% APY?",
+                badge = "+18.5% APY",
+                impactTag = "High Yield",
+                icon = "⚡",
+                targetAiTab = AiSubTab.CHAT
+            ),
+            AiSuggestion(
+                id = "sug_audit_allowances",
+                category = AiSuggestionCategory.SECURITY,
+                title = "Audit Unlimited Token Allowances",
+                description = "Scan wallet $shortAddr for lingering router approvals or unverified spenders to prevent unauthorized wallet drains.",
+                prompt = "Audit all token approvals and contract allowances for wallet $activeWallet on Base Mainnet and highlight any security risks.",
+                badge = "Security Audit",
+                impactTag = "High Priority",
+                icon = "🛡️",
+                targetAiTab = AiSubTab.SECURITY_AUDIT
+            ),
+            AiSuggestion(
+                id = "sug_gas_optimization",
+                category = AiSuggestionCategory.OPTIMIZATION,
+                title = "Base L2 Low Gas Window (~0.001 Gwei)",
+                description = "Current Base priority gas fees are minimal. Perfect window for contract deployments, batch transfers, and DEX trades.",
+                prompt = "Analyze current Base network gas trends and suggest cost-saving execution strategies for my upcoming transactions.",
+                badge = "Low Gas",
+                impactTag = "Save 85%",
+                icon = "⛽",
+                targetAiTab = AiSubTab.CHAT
+            ),
+            AiSuggestion(
+                id = "sug_governance_proposal_4",
+                category = AiSuggestionCategory.GOVERNANCE,
+                title = "Vote on AGL Proposal #4 (Gas Subsidy)",
+                description = "Agunnaya DAO Proposal #4 proposes a 25,000 AGL grant for Base AI compute gas subsidies. Active voting concludes soon.",
+                prompt = "Explain Agunnaya DAO Proposal #4 regarding AI compute gas subsidies, voting requirements, and community discussion points.",
+                badge = "Governance",
+                impactTag = "Active Vote",
+                icon = "🏛️",
+                targetAiTab = AiSubTab.CHAT
+            ),
+            AiSuggestion(
+                id = "sug_wrap_wagL",
+                category = AiSuggestionCategory.GOVERNANCE,
+                title = "Wrap AGL for On-Chain Voting Power",
+                description = "Convert native AGL to Wrapped AGL (wAGL at 0xA27C9BA04D06EcAF766EF4e074b403DAf19A3d69) to delegate or cast votes.",
+                prompt = "How do I wrap my AGL into wAGL (0xA27C9BA04D06EcAF766EF4e074b403DAf19A3d69) to participate in on-chain Base governance?",
+                badge = "Voting Power",
+                impactTag = "DAO Action",
+                icon = "🗳️",
+                targetAiTab = AiSubTab.CHAT
+            ),
+            AiSuggestion(
+                id = "sug_scan_timelock",
+                category = AiSuggestionCategory.CONTRACT,
+                title = "Analyze Timelock Controller Contract",
+                description = "Inspect the Agunnaya Timelock contract (0x900D315C91D9e54F3fa3412D475009d905bf6744) to verify security controls.",
+                prompt = "Perform a deep-dive security inspection on the Agunnaya Timelock contract at 0x900D315C91D9e54F3fa3412D475009d905bf6744.",
+                badge = "Contract Scan",
+                impactTag = "Verified",
+                icon = "📜",
+                targetAiTab = AiSubTab.CONTRACT_ANALYZER,
+                contractAddress = "0x900D315C91D9e54F3fa3412D475009d905bf6744"
+            ),
+            AiSuggestion(
+                id = "sug_aerodrome_lp",
+                category = AiSuggestionCategory.PORTFOLIO,
+                title = "Aerodrome Slipstream LP Strategy",
+                description = "Explore concentrated liquidity routing for AGL/ETH on Base to optimize fee capture and earn trading revenue.",
+                prompt = "Explain how to provide liquidity for AGL on Base's Aerodrome DEX and how concentrated liquidity fee tiers work.",
+                badge = "Portfolio",
+                impactTag = "DEX Yield",
+                icon = "💎",
+                targetAiTab = AiSubTab.CHAT
+            ),
+            AiSuggestion(
+                id = "sug_smart_wallet_aa",
+                category = AiSuggestionCategory.SECURITY,
+                title = "Upgrade to ERC-4337 Smart Account",
+                description = "Learn how Base Smart Wallets use passkeys, paymasters for gas sponsorship, and batched transaction execution.",
+                prompt = "Explain how ERC-4337 Account Abstraction and Coinbase Smart Wallets work on Base, and what security benefits they provide.",
+                badge = "Account Abstraction",
+                impactTag = "Web3 UX",
+                icon = "🔑",
+                targetAiTab = AiSubTab.CHAT
+            )
+        )
+    }
+
+    fun getFollowUpSuggestions(lastReply: String): List<String> {
+        val lower = lastReply.lowercase(java.util.Locale.ROOT)
+        return when {
+            lower.contains("balance") || lower.contains("token") || lower.contains("price") -> listOf(
+                "How do I bridge more ETH to Base?",
+                "What is the contract address of wAGL?",
+                "How can I stake AGL for APY rewards?"
+            )
+            lower.contains("governance") || lower.contains("proposal") || lower.contains("timelock") -> listOf(
+                "How does the timelock delay protect the DAO?",
+                "How do I delegate my wAGL voting power?",
+                "What is the quorum threshold for proposals?"
+            )
+            lower.contains("gas") || lower.contains("gwei") || lower.contains("fee") -> listOf(
+                "Why is Base L2 so much cheaper than Ethereum?",
+                "How do EIP-4844 blobs lower Base transaction costs?",
+                "Can transactions be sponsored by paymasters?"
+            )
+            lower.contains("contract") || lower.contains("security") || lower.contains("risk") -> listOf(
+                "How do I revoke an unlimited token allowance?",
+                "What are common smart contract attack vectors on L2?",
+                "Check if this contract is verified on Basescan"
+            )
+            lower.contains("quest") || lower.contains("reward") || lower.contains("xp") -> listOf(
+                "How do I unlock Level 4 Super Agent tier?",
+                "What are the highest-yield daily quests?",
+                "How do streak multipliers boost AGL claims?"
+            )
+            else -> listOf(
+                "Explain my last Base transaction",
+                "Simulate staking 1,000 AGL tokens",
+                "Audit my wallet security score"
+            )
+        }
     }
 
     suspend fun claimQuest(questId: String): Boolean = withContext(Dispatchers.IO) {

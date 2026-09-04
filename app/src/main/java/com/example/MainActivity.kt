@@ -120,7 +120,17 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
                         onNavigateQuestsTab = { tab -> viewModel.setQuestsSubTab(tab) },
                         onSelectTransaction = { tx -> viewModel.setSelectedTransaction(tx) },
                         onClaimQuest = { questId -> viewModel.claimQuest(questId) },
-                        onDailyCheckIn = { viewModel.claimDailyCheckIn() }
+                        onDailyCheckIn = { viewModel.claimDailyCheckIn() },
+                        aiSuggestions = uiState.aiSuggestions,
+                        selectedAiCategory = uiState.selectedAiSuggestionCategory,
+                        isRefreshingSuggestions = uiState.isRefreshingSuggestions,
+                        onSelectAiCategory = { cat -> viewModel.selectAiSuggestionCategory(cat) },
+                        onRefreshSuggestions = { viewModel.refreshAiSuggestions() },
+                        onApplySuggestion = { sug -> viewModel.applyAiSuggestion(sug) },
+                        isIndexingTransactions = uiState.isIndexingTransactions,
+                        indexerStatus = uiState.indexerStatusMessage,
+                        onRefreshTransactions = { viewModel.refreshRecentTransactions() },
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
                     )
                 }
 
@@ -145,7 +155,10 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
                             viewModel.navigateToScreen(AppScreen.AI_ASSISTANT)
                             viewModel.sendChatMessage("Explain transaction ${tx.hash.take(12)}... in simple terms.")
                         },
-                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) },
+                        isIndexingTransactions = uiState.isIndexingTransactions,
+                        indexerStatus = uiState.indexerStatusMessage,
+                        onRefreshTransactions = { viewModel.refreshRecentTransactions() }
                     )
                 }
 
@@ -162,7 +175,12 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
                         onAnalyzeContract = { addr -> viewModel.analyzeContract(addr) },
                         securityReport = uiState.securityAuditResult,
                         isAuditingSecurity = uiState.isAuditingSecurity,
-                        onAuditSecurity = { target -> viewModel.auditSecurity(target) }
+                        onAuditSecurity = { target -> viewModel.auditSecurity(target) },
+                        suggestions = uiState.aiSuggestions,
+                        selectedSuggestionCategory = uiState.selectedAiSuggestionCategory,
+                        onSelectSuggestionCategory = { cat -> viewModel.selectAiSuggestionCategory(cat) },
+                        followUpSuggestions = uiState.followUpSuggestions,
+                        onApplySuggestion = { sug -> viewModel.applyAiSuggestion(sug) }
                     )
                 }
 
@@ -182,7 +200,8 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
                         onSelectLeaderboardTimeframe = { tf -> viewModel.selectLeaderboardTimeframe(tf) },
                         userProfile = uiState.userProfile,
                         rewardsHistory = rewardsHistory,
-                        onDailyCheckIn = { viewModel.claimDailyCheckIn() }
+                        onDailyCheckIn = { viewModel.claimDailyCheckIn() },
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
                     )
                 }
 

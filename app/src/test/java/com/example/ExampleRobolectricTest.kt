@@ -141,4 +141,49 @@ class ExampleRobolectricTest {
         assertTrue(timelockDetails.name.contains("Timelock"))
         assertTrue(timelockDetails.readFunctions.any { it.name == "getMinDelay" })
     }
+
+    @Test
+    fun `test AglTokenService contract configuration and methods`() {
+        val aglService = com.example.data.remote.blockchain.AglTokenService()
+        assertEquals("0xEA1221B4d80A89BD8C75248Fae7c176BD1854698", aglService.contractAddress)
+        assertEquals("0xEA1221B4d80A89BD8C75248Fae7c176BD1854698", com.example.data.remote.blockchain.AglTokenService.AGL_TOKEN_CONTRACT)
+
+        val recipient = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+        val amount = BigInteger("1000000000000000000") // 1 AGL
+        val transferData = aglService.encodeTransferData(recipient, amount)
+        assertTrue(transferData.startsWith(Erc20Abi.SELECTOR_TRANSFER))
+
+        val approveData = aglService.encodeApproveData(recipient, amount)
+        assertTrue(approveData.startsWith(Erc20Abi.SELECTOR_APPROVE))
+    }
+
+    @Test
+    fun `test AglCreditsService contract configuration and methods`() {
+        val creditsService = com.example.data.remote.blockchain.AglCreditsService()
+        assertEquals("0x13866F31c60822Ff70684213b9727915Ddf2c183", creditsService.contractAddress)
+        assertEquals("0x13866F31c60822Ff70684213b9727915Ddf2c183", com.example.data.remote.blockchain.AglCreditsService.AGL_CREDITS_CONTRACT)
+
+        val amount = BigInteger("5000000000000000000") // 5 credits
+        val purchaseData = creditsService.encodePurchaseCredits(amount)
+        assertTrue(purchaseData.startsWith(com.example.data.remote.blockchain.abi.CreditsAbi.SELECTOR_PURCHASE_CREDITS))
+    }
+
+    @Test
+    fun `test WagLService contract configuration and methods`() {
+        val wagLService = com.example.data.remote.blockchain.WagLService()
+        assertEquals("0xA27C9BA04D06EcAF766EF4e074b403DAf19A3d69", wagLService.contractAddress)
+        assertEquals("0xA27C9BA04D06EcAF766EF4e074b403DAf19A3d69", com.example.data.remote.blockchain.WagLService.WAGL_CONTRACT_ADDRESS)
+
+        val account = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+        val amount = BigInteger("1000000000000000000") // 1 wAGL
+
+        val depositData = wagLService.encodeDepositFor(account, amount)
+        assertTrue(depositData.startsWith(com.example.data.remote.blockchain.abi.VotesWrapperAbi.SELECTOR_DEPOSIT_FOR))
+
+        val withdrawData = wagLService.encodeWithdrawTo(account, amount)
+        assertTrue(withdrawData.startsWith(com.example.data.remote.blockchain.abi.VotesWrapperAbi.SELECTOR_WITHDRAW_TO))
+
+        val delegateData = wagLService.encodeDelegate(account)
+        assertTrue(delegateData.startsWith(com.example.data.remote.blockchain.abi.VotesWrapperAbi.SELECTOR_DELEGATE))
+    }
 }

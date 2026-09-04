@@ -74,13 +74,15 @@ fun LeaderboardScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                LeaderboardTimeframe.values().forEach { timeframe ->
+                LeaderboardTimeframe.entries.forEach { timeframe ->
                     FilterChip(
                         selected = selectedTimeframe == timeframe,
                         onClick = { onSelectTimeframe(timeframe) },
                         label = {
                             Text(
-                                text = timeframe.name.replace("_", " ").lowercase().capitalize(),
+                                text = timeframe.name.replace("_", " ").lowercase().replaceFirstChar { 
+                                    if (it.isLowerCase()) it.titlecase() else it.toString() 
+                                },
                                 fontSize = 11.sp
                             )
                         },

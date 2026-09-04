@@ -9,6 +9,8 @@ import com.example.data.local.entities.UserProgressEntity
 import com.example.data.local.entities.WalletAccountEntity
 import com.example.data.model.AglEcosystemContract
 import com.example.data.model.AglEcosystemStats
+import com.example.data.model.AiSuggestion
+import com.example.data.model.AiSuggestionCategory
 import com.example.data.model.BaseTransaction
 import com.example.data.model.LeaderboardTimeframe
 import com.example.data.model.LeaderboardUser
@@ -84,7 +86,13 @@ data class UiState(
     val showNotificationDialog: Boolean = false,
     val showSettingsDialog: Boolean = false,
     val showSecurityPrinciplesDialog: Boolean = false,
-    val snackbarMessage: String? = null
+    val snackbarMessage: String? = null,
+    val aiSuggestions: List<AiSuggestion> = emptyList(),
+    val selectedAiSuggestionCategory: AiSuggestionCategory = AiSuggestionCategory.ALL,
+    val isRefreshingSuggestions: Boolean = false,
+    val followUpSuggestions: List<String> = emptyList(),
+    val isIndexingTransactions: Boolean = false,
+    val indexerStatusMessage: String = "Live Basescan Indexer"
 )
 
 class MainViewModel(private val repository: AppRepository) : ViewModel() {
@@ -135,6 +143,8 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
             val ecoContracts = repository.getEcosystemContracts()
             val profile = repository.getUserProfile()
             val leaderboard = repository.getLeaderboard(_uiState.value.activeLeaderboardTimeframe)
+            val suggestions = repository.getAiSuggestions(walletAddr, summary)
+            val defaultFollowUps = repository.getFollowUpSuggestions("")
 
             _uiState.update {
                 it.copy(
@@ -146,6 +156,8 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                     ecosystemContracts = ecoContracts,
                     userProfile = profile,
                     leaderboardUsers = leaderboard,
+                    aiSuggestions = suggestions,
+                    followUpSuggestions = defaultFollowUps,
                     isConnected = true
                 )
             }
@@ -166,12 +178,15 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
     fun refreshData() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshing = true, isFetchingLiveBalances = true) }
+            _uiState.update { it.copy(isRefreshing = true, isFetchingLiveBalances = true, isIndexingTransactions = true) }
             val walletAddr = repository.getActiveWalletAddress()
             val liveState = repository.getLiveWalletState(walletAddr)
             val tokens = repository.getWalletTokens(walletAddr)
             val summary = repository.getPortfolioSummary(walletAddr)
             val profile = repository.getUserProfile()
+            val txResult = repository.refreshRecentTransactions(walletAddr)
+            val txCount = txResult.getOrNull()?.size ?: 0
+
             _uiState.update {
                 it.copy(
                     tokens = tokens,
@@ -179,10 +194,28 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                     portfolioSummary = summary,
                     userProfile = profile,
                     isRefreshing = false,
-                    isFetchingLiveBalances = false
+                    isFetchingLiveBalances = false,
+                    isIndexingTransactions = false,
+                    indexerStatusMessage = "Live Basescan Indexer ($txCount txs)"
                 )
             }
-            showSnackbar("Base on-chain balances updated: ${liveState.formattedAglBalance} AGL, ${liveState.formattedWAglBalance} wAGL")
+            showSnackbar("Base on-chain balances & activity updated: ${liveState.formattedAglBalance} AGL, ${liveState.formattedWAglBalance} wAGL")
+        }
+    }
+
+    fun refreshRecentTransactions() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isIndexingTransactions = true) }
+            val walletAddr = repository.getActiveWalletAddress()
+            val result = repository.refreshRecentTransactions(walletAddr)
+            val count = result.getOrNull()?.size ?: 0
+            _uiState.update {
+                it.copy(
+                    isIndexingTransactions = false,
+                    indexerStatusMessage = "Live Basescan Indexer ($count txs)"
+                )
+            }
+            showSnackbar("Synced $count on-chain transactions with AI summaries")
         }
     }
 
@@ -267,15 +300,70 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         if (text.isBlank()) return
         viewModelScope.launch {
             _uiState.update { it.copy(isAiThinking = true) }
-            repository.sendChatMessage(text)
-            _uiState.update { it.copy(isAiThinking = false) }
+            val agentMsg = repository.sendChatMessage(text)
+            val followUps = repository.getFollowUpSuggestions(agentMsg.text)
+            val activeWallet = repository.getActiveWalletAddress()
+            val liveState = repository.getLiveWalletState(activeWallet)
+            val summary = repository.getPortfolioSummary(activeWallet)
+            _uiState.update {
+                it.copy(
+                    isAiThinking = false,
+                    followUpSuggestions = followUps,
+                    liveWalletState = liveState,
+                    portfolioSummary = summary
+                )
+            }
         }
     }
 
     fun clearChatHistory() {
         viewModelScope.launch {
             repository.clearChatHistory()
+            val defaultFollowUps = repository.getFollowUpSuggestions("")
+            _uiState.update { it.copy(followUpSuggestions = defaultFollowUps) }
             showSnackbar("Chat history cleared")
+        }
+    }
+
+    fun selectAiSuggestionCategory(category: AiSuggestionCategory) {
+        _uiState.update { it.copy(selectedAiSuggestionCategory = category) }
+    }
+
+    fun refreshAiSuggestions() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshingSuggestions = true) }
+            val walletAddr = repository.getActiveWalletAddress()
+            val summary = repository.getPortfolioSummary(walletAddr)
+            val suggestions = repository.getAiSuggestions(walletAddr, summary)
+            _uiState.update {
+                it.copy(
+                    aiSuggestions = suggestions,
+                    isRefreshingSuggestions = false
+                )
+            }
+            showSnackbar("AI suggestions updated for Base Mainnet")
+        }
+    }
+
+    fun applyAiSuggestion(suggestion: AiSuggestion) {
+        when (suggestion.targetAiTab) {
+            AiSubTab.CONTRACT_ANALYZER -> {
+                setAiSubTab(AiSubTab.CONTRACT_ANALYZER)
+                navigateToScreen(AppScreen.AI_ASSISTANT)
+                if (!suggestion.contractAddress.isNullOrBlank()) {
+                    analyzeContract(suggestion.contractAddress)
+                }
+            }
+            AiSubTab.SECURITY_AUDIT -> {
+                setAiSubTab(AiSubTab.SECURITY_AUDIT)
+                navigateToScreen(AppScreen.AI_ASSISTANT)
+                auditSecurity(suggestion.contractAddress ?: _uiState.value.activeWalletAddress)
+            }
+            else -> {
+                setAiSubTab(AiSubTab.CHAT)
+                navigateToScreen(AppScreen.AI_ASSISTANT)
+                sendChatMessage(suggestion.prompt)
+            }
         }
     }
 

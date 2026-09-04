@@ -1,64 +1,22 @@
 package com.example.data.remote.blockchain.services
 
-import com.example.data.remote.blockchain.abi.CreditsAbi
-import com.example.data.remote.blockchain.abi.EvmCoder
-import com.example.data.remote.blockchain.config.BaseBlockchainConfig
-import com.example.data.remote.blockchain.rpc.BaseRpcService
-import java.math.BigInteger
+/**
+ * Typealias for backward compatibility with existing imports referencing
+ * [com.example.data.remote.blockchain.services.AglCreditsService] pointing to
+ * [com.example.data.remote.blockchain.AglCreditsService].
+ */
+typealias AglCreditsService = com.example.data.remote.blockchain.AglCreditsService
 
-data class AglCreditsInfo(
-    val contractAddress: String,
-    val owner: String?,
-    val aglTokenAddress: String?,
-    val isPaused: Boolean,
-    val burnAddress: String?,
-    val userCreditsPurchased: BigInteger,
-    val formattedUserCredits: String
-)
+/**
+ * Typealias for backward compatibility with existing imports referencing
+ * [com.example.data.remote.blockchain.services.AglCreditsInfo] pointing to
+ * [com.example.data.remote.blockchain.AglCreditsInfo].
+ */
+typealias AglCreditsInfo = com.example.data.remote.blockchain.AglCreditsInfo
 
-class AglCreditsService(
-    private val rpcService: BaseRpcService = BaseRpcService(),
-    val contractAddress: String = BaseBlockchainConfig.AGL_CREDITS_CONTRACT
-) {
-
-    suspend fun getCreditsInfo(userAddress: String? = null): Result<AglCreditsInfo> {
-        return try {
-            val ownerRes = rpcService.ethCall(contractAddress, CreditsAbi.SELECTOR_OWNER).getOrNull()
-            val aglRes = rpcService.ethCall(contractAddress, CreditsAbi.SELECTOR_AGL_TOKEN).getOrNull()
-            val pausedRes = rpcService.ethCall(contractAddress, CreditsAbi.SELECTOR_PAUSED).getOrNull()
-            val burnRes = rpcService.ethCall(contractAddress, CreditsAbi.SELECTOR_BURN_ADDRESS).getOrNull()
-
-            val userCredits = if (!userAddress.isNullOrBlank()) {
-                val call = CreditsAbi.encodeTotalCreditsPurchased(userAddress)
-                val res = rpcService.ethCall(contractAddress, call).getOrNull()
-                EvmCoder.decodeUint256(res)
-            } else {
-                BigInteger.ZERO
-            }
-
-            val info = AglCreditsInfo(
-                contractAddress = contractAddress,
-                owner = EvmCoder.decodeAddress(ownerRes) ?: BaseBlockchainConfig.TIMELOCK_CONTRACT,
-                aglTokenAddress = EvmCoder.decodeAddress(aglRes) ?: BaseBlockchainConfig.AGL_TOKEN_CONTRACT,
-                isPaused = EvmCoder.decodeBool(pausedRes),
-                burnAddress = EvmCoder.decodeAddress(burnRes),
-                userCreditsPurchased = userCredits,
-                formattedUserCredits = EvmCoder.formatUnits(userCredits, 18, 2)
-            )
-            Result.success(info)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun getUserCredits(userAddress: String): Result<BigInteger> {
-        val call = CreditsAbi.encodeTotalCreditsPurchased(userAddress)
-        return rpcService.ethCall(contractAddress, call).map { hex ->
-            EvmCoder.decodeUint256(hex)
-        }
-    }
-
-    fun encodePurchaseCredits(amountWei: BigInteger): String {
-        return CreditsAbi.encodePurchaseCredits(amountWei)
-    }
-}
+/**
+ * Typealias for backward compatibility with existing imports referencing
+ * [com.example.data.remote.blockchain.services.CreditPurchaseEvent] pointing to
+ * [com.example.data.remote.blockchain.CreditPurchaseEvent].
+ */
+typealias CreditPurchaseEvent = com.example.data.remote.blockchain.CreditPurchaseEvent
