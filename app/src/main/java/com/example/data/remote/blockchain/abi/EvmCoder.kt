@@ -69,6 +69,15 @@ object EvmCoder {
         return clean.padEnd(64, '0').take(64)
     }
 
+    fun encodeString(value: String): String {
+        val bytes = value.toByteArray(StandardCharsets.UTF_8)
+        val lengthHex = encodeUint256(bytes.size.toLong())
+        val dataHex = bytes.joinToString("") { "%02x".format(it) }
+        val remainder = dataHex.length % 64
+        val paddedData = if (remainder == 0) dataHex else dataHex.padEnd(dataHex.length + (64 - remainder), '0')
+        return lengthHex + paddedData
+    }
+
     fun decodeAddress(hex: String?): String? {
         if (hex.isNullOrBlank() || hex == "0x") return null
         val clean = cleanHex(hex)

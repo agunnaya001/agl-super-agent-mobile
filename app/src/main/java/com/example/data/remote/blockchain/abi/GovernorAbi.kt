@@ -78,4 +78,25 @@ object GovernorAbi {
     fun encodeCastVote(proposalId: BigInteger, support: Int): String {
         return SELECTOR_CAST_VOTE + EvmCoder.encodeUint256(proposalId) + EvmCoder.encodeUint256(BigInteger.valueOf(support.toLong()))
     }
+
+    fun encodeHasVoted(proposalId: BigInteger, account: String): String {
+        return SELECTOR_HAS_VOTED + EvmCoder.encodeUint256(proposalId) + EvmCoder.encodeAddress(account)
+    }
+
+    fun encodeCastVoteWithReason(proposalId: BigInteger, support: Int, reason: String): String {
+        val offset = BigInteger.valueOf(96) // 3 * 32 bytes head
+        return SELECTOR_CAST_VOTE_WITH_REASON +
+            EvmCoder.encodeUint256(proposalId) +
+            EvmCoder.encodeUint256(BigInteger.valueOf(support.toLong())) +
+            EvmCoder.encodeUint256(offset) +
+            EvmCoder.encodeString(reason)
+    }
+
+    fun encodeQueue(proposalId: BigInteger): String {
+        return SELECTOR_QUEUE + EvmCoder.encodeUint256(proposalId)
+    }
+
+    fun encodeExecute(proposalId: BigInteger): String {
+        return SELECTOR_EXECUTE + EvmCoder.encodeUint256(proposalId)
+    }
 }

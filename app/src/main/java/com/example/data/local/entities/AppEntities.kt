@@ -105,8 +105,25 @@ data class NotificationEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val title: String,
     val message: String,
-    val type: String, // "SECURITY", "TRANSACTION", "REWARD", "MISSION"
+    val type: String, // "SECURITY", "TRANSACTION", "REWARD", "MISSION", "PRICE_ALERT"
     val timestamp: Long = System.currentTimeMillis(),
     val isRead: Boolean = false,
     val referenceId: String? = null
+)
+
+@Entity(tableName = "price_alerts")
+data class PriceAlertEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val tokenSymbol: String = "AGL",
+    val targetPriceUsd: Double,
+    val condition: String, // "ABOVE" or "BELOW"
+    val note: String = "",
+    val isEnabled: Boolean = true,
+    val isTriggered: Boolean = false,
+    val triggerCount: Int = 0,
+    val lastTriggeredPriceUsd: Double? = null,
+    val lastTriggeredTimestamp: Long? = null,
+    val createdTimestamp: Long = System.currentTimeMillis(),
+    val oracleSource: String = "Chainlink Aggregator V3 (Base)",
+    val oneTimeOnly: Boolean = false
 )

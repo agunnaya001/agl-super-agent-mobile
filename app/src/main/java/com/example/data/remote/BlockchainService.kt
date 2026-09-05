@@ -53,6 +53,7 @@ object BlockchainService {
     val aglStakingService = com.example.data.remote.blockchain.AglStakingService(rpcService)
     val governorService = GovernorService(rpcService)
     val timelockService = TimelockService(rpcService)
+    val aglPriceOracleService = com.example.data.remote.blockchain.services.AglPriceOracleService(rpcService)
     val verifier = com.example.data.remote.blockchain.diagnostics.ContractRelationshipVerifier(rpcService)
     val txEngine = com.example.data.remote.blockchain.tx.TransactionPipelineEngine(rpcService)
     val walletService = WalletService(rpcService, aglTokenService, wagLService, aglCreditsService)

@@ -87,6 +87,7 @@ import com.example.ui.components.GlassCard
 import com.example.ui.components.RecentTransactionsComponent
 import com.example.ui.components.TokenRow
 import com.example.ui.components.TransactionRow
+import com.example.ui.components.charts.TokenBalancePieChart
 import com.example.ui.theme.BaseBlue
 import com.example.ui.theme.BaseCyan
 import com.example.ui.theme.DarkBackground
@@ -253,6 +254,20 @@ fun WalletScreen(
 
         when (selectedWalletTab) {
             0 -> {
+                // Interactive Recharts-Style Token Balance Pie Chart
+                item {
+                    TokenBalancePieChart(
+                        walletAddress = activeWalletAddress ?: BaseBlockchainConfig.DEFAULT_DEMO_WALLET,
+                        title = "Token Balance Breakdown",
+                        onSliceSelected = { slice ->
+                            if (slice != null) {
+                                onShowSnackbar("${slice.name}: ${slice.formattedBalance} (${slice.formattedValueUsd})")
+                            }
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
                 // Tokens list
                 item {
                     Text(

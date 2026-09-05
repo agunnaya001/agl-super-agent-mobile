@@ -8,6 +8,7 @@ import androidx.room.Update
 import com.example.data.local.entities.ChatMessageEntity
 import com.example.data.local.entities.ContractScanEntity
 import com.example.data.local.entities.NotificationEntity
+import com.example.data.local.entities.PriceAlertEntity
 import com.example.data.local.entities.QuestEntity
 import com.example.data.local.entities.RewardHistoryEntity
 import com.example.data.local.entities.TransactionEntity
@@ -118,4 +119,37 @@ interface NotificationDao {
 
     @Query("UPDATE app_notifications SET isRead = 1")
     suspend fun markAllAsRead()
+}
+
+@Dao
+interface PriceAlertDao {
+    @Query("SELECT * FROM price_alerts ORDER BY createdTimestamp DESC")
+    fun getAllAlerts(): Flow<List<PriceAlertEntity>>
+
+    @Query("SELECT * FROM price_alerts WHERE isEnabled = 1")
+    suspend fun getActiveAlerts(): List<PriceAlertEntity>
+
+    @Query("SELECT * FROM price_alerts WHERE id = :id LIMIT 1")
+    suspend fun getAlertById(id: Long): PriceAlertEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAlert(alert: PriceAlertEntity): Long
+
+    @Update
+    suspend fun updateAlert(alert: PriceAlertEntity)
+
+    @Query("UPDATE price_alerts SET isEnabled = :enabled WHERE id = :id")
+    suspend fun setAlertEnabled(id: Long, enabled: Boolean)
+
+    @Query("UPDATE price_alerts SET isTriggered = 1, triggerCount = triggerCount + 1, lastTriggeredPriceUsd = :triggeredPrice, lastTriggeredTimestamp = :timestamp WHERE id = :id")
+    suspend fun markAlertTriggered(id: Long, triggeredPrice: Double, timestamp: Long)
+
+    @Query("UPDATE price_alerts SET isTriggered = 0 WHERE id = :id")
+    suspend fun rearmAlert(id: Long)
+
+    @Query("DELETE FROM price_alerts WHERE id = :id")
+    suspend fun deleteAlert(id: Long)
+
+    @Query("DELETE FROM price_alerts")
+    suspend fun clearAllAlerts()
 }

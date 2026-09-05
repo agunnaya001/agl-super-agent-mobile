@@ -218,12 +218,17 @@ class TransactionPipelineEngine(
             0 -> "AGAINST"
             else -> "ABSTAIN"
         }
+        val calldata = if (!reason.isNullOrBlank()) {
+            GovernorAbi.encodeCastVoteWithReason(proposalId, support, reason)
+        } else {
+            GovernorAbi.encodeCastVote(proposalId, support)
+        }
         return TxPipelineRequest(
             title = "Cast DAO Vote ($supportLabel)",
-            description = "Vote $supportLabel on Agunnaya DAO Proposal #${proposalId.toString().take(6)}...",
+            description = "Vote $supportLabel on Agunnaya DAO Proposal #$proposalId" + (if (!reason.isNullOrBlank()) " • Reason: $reason" else ""),
             targetContract = BaseBlockchainConfig.GOVERNOR_CONTRACT,
             tokenRequired = null,
-            calldata = GovernorAbi.encodeCastVote(proposalId, support)
+            calldata = calldata
         )
     }
 }

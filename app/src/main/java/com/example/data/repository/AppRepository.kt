@@ -4,6 +4,7 @@ import com.example.data.local.AppDatabase
 import com.example.data.local.entities.ChatMessageEntity
 import com.example.data.local.entities.ContractScanEntity
 import com.example.data.local.entities.NotificationEntity
+import com.example.data.local.entities.PriceAlertEntity
 import com.example.data.local.entities.QuestEntity
 import com.example.data.local.entities.RewardHistoryEntity
 import com.example.data.local.entities.TransactionEntity
@@ -11,6 +12,7 @@ import com.example.data.local.entities.UserProgressEntity
 import com.example.data.local.entities.WalletAccountEntity
 import com.example.data.model.AglEcosystemContract
 import com.example.data.model.AglEcosystemStats
+import com.example.data.model.AglOraclePriceData
 import com.example.data.model.BaseTransaction
 import com.example.data.model.AiSuggestion
 import com.example.data.model.AiSuggestionCategory
@@ -32,6 +34,7 @@ import com.example.data.remote.BlockchainService
 import com.example.data.remote.GeminiServiceClient
 import com.example.data.remote.blockchain.services.LiveWalletState
 import com.example.ui.viewmodel.AiSubTab
+import com.example.util.PriceAlertNotificationManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -40,7 +43,10 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
-class AppRepository(private val database: AppDatabase) {
+class AppRepository(
+    private val database: AppDatabase,
+    private val notificationManager: PriceAlertNotificationManager? = null
+) {
 
     private val geminiClient = GeminiServiceClient()
 
@@ -63,6 +69,7 @@ class AppRepository(private val database: AppDatabase) {
     val rewardsHistory: Flow<List<RewardHistoryEntity>> = database.rewardDao().getAllRewards()
     val notifications: Flow<List<NotificationEntity>> = database.notificationDao().getAllNotifications()
     val userProgress: Flow<UserProgressEntity?> = database.userProgressDao().getUserProgress()
+    val allPriceAlerts: Flow<List<PriceAlertEntity>> = database.priceAlertDao().getAllAlerts()
 
     suspend fun initializeSeedDataIfNeeded() = withContext(Dispatchers.IO) {
         val existingWallets = database.walletDao().getAllWallets().firstOrNull()
@@ -133,6 +140,38 @@ class AppRepository(private val database: AppDatabase) {
                     message = "Your Base wallet intelligence center is online. 45 AGL in unclaimed quest rewards ready!",
                     type = "REWARD",
                     referenceId = "initial_welcome"
+                )
+            )
+
+            // Initial price alert thresholds
+            database.priceAlertDao().insertAlert(
+                PriceAlertEntity(
+                    tokenSymbol = "AGL",
+                    targetPriceUsd = 3.80,
+                    condition = "ABOVE",
+                    note = "Resistance Breakout Target (Base Ecosystem Expansion)",
+                    isEnabled = true,
+                    oracleSource = "Chainlink Aggregator V3 (Base)"
+                )
+            )
+            database.priceAlertDao().insertAlert(
+                PriceAlertEntity(
+                    tokenSymbol = "AGL",
+                    targetPriceUsd = 3.20,
+                    condition = "BELOW",
+                    note = "DCA Dip Accumulation Zone",
+                    isEnabled = true,
+                    oracleSource = "Chainlink & Aerodrome Oracle"
+                )
+            )
+            database.priceAlertDao().insertAlert(
+                PriceAlertEntity(
+                    tokenSymbol = "AGL",
+                    targetPriceUsd = 4.50,
+                    condition = "ABOVE",
+                    note = "New Cycle High Target",
+                    isEnabled = false,
+                    oracleSource = "Chainlink Aggregator V3 (Base)"
                 )
             )
         }
@@ -687,8 +726,9 @@ class AppRepository(private val database: AppDatabase) {
         BlockchainService.governorService.getGovernorDetails().getOrNull()
     }
 
-    suspend fun getGovernanceProposals() = withContext(Dispatchers.IO) {
-        BlockchainService.governorService.getProposals().getOrDefault(emptyList())
+    suspend fun getGovernanceProposals(walletAddress: String? = null) = withContext(Dispatchers.IO) {
+        val active = walletAddress ?: getActiveWalletAddress()
+        BlockchainService.governorService.getProposals(active).getOrDefault(emptyList())
     }
 
     suspend fun getTimelockInfo() = withContext(Dispatchers.IO) {
@@ -701,6 +741,135 @@ class AppRepository(private val database: AppDatabase) {
 
     fun getTxEngine(): com.example.data.remote.blockchain.tx.TransactionPipelineEngine {
         return BlockchainService.txEngine
+    }
+
+    // Price Alert & External Oracle Engine
+    suspend fun fetchOraclePrice(): Result<AglOraclePriceData> = withContext(Dispatchers.IO) {
+        val result = BlockchainService.aglPriceOracleService.fetchCurrentPrice()
+        if (result.isSuccess) {
+            val priceData = result.getOrThrow()
+            checkPriceAlerts(priceData.currentPriceUsd, priceData)
+        }
+        result
+    }
+
+    suspend fun simulateOraclePrice(priceUsd: Double?): Result<AglOraclePriceData> = withContext(Dispatchers.IO) {
+        BlockchainService.aglPriceOracleService.setSimulatedPriceOverride(priceUsd)
+        val result = BlockchainService.aglPriceOracleService.fetchCurrentPrice()
+        if (result.isSuccess) {
+            val priceData = result.getOrThrow()
+            checkPriceAlerts(priceData.currentPriceUsd, priceData)
+        }
+        result
+    }
+
+    suspend fun addPriceAlert(
+        targetPriceUsd: Double,
+        condition: String,
+        note: String,
+        oneTimeOnly: Boolean = false,
+        oracleSource: String = "Chainlink Aggregator V3 (Base)"
+    ): Long = withContext(Dispatchers.IO) {
+        val alert = PriceAlertEntity(
+            tokenSymbol = "AGL",
+            targetPriceUsd = targetPriceUsd,
+            condition = condition,
+            note = note,
+            isEnabled = true,
+            isTriggered = false,
+            oracleSource = oracleSource,
+            oneTimeOnly = oneTimeOnly
+        )
+        val id = database.priceAlertDao().insertAlert(alert)
+        val currentPrice = BlockchainService.aglPriceOracleService.getLatestCachedPrice()
+        checkPriceAlerts(currentPrice.currentPriceUsd, currentPrice)
+        id
+    }
+
+    suspend fun togglePriceAlert(id: Long, enabled: Boolean) = withContext(Dispatchers.IO) {
+        database.priceAlertDao().setAlertEnabled(id, enabled)
+    }
+
+    suspend fun rearmPriceAlert(id: Long) = withContext(Dispatchers.IO) {
+        database.priceAlertDao().rearmAlert(id)
+        database.priceAlertDao().setAlertEnabled(id, true)
+    }
+
+    suspend fun deletePriceAlert(id: Long) = withContext(Dispatchers.IO) {
+        database.priceAlertDao().deleteAlert(id)
+    }
+
+    suspend fun clearAllPriceAlerts() = withContext(Dispatchers.IO) {
+        database.priceAlertDao().clearAllAlerts()
+    }
+
+    suspend fun checkPriceAlerts(
+        currentPrice: Double,
+        oracleData: AglOraclePriceData
+    ): List<PriceAlertEntity> = withContext(Dispatchers.IO) {
+        val activeAlerts = database.priceAlertDao().getActiveAlerts()
+        val triggered = mutableListOf<PriceAlertEntity>()
+
+        for (alert in activeAlerts) {
+            val shouldTrigger = when (alert.condition) {
+                "ABOVE" -> currentPrice >= alert.targetPriceUsd
+                "BELOW" -> currentPrice <= alert.targetPriceUsd
+                else -> false
+            }
+
+            if (shouldTrigger && !alert.isTriggered) {
+                val now = System.currentTimeMillis()
+                database.priceAlertDao().markAlertTriggered(alert.id, currentPrice, now)
+                if (alert.oneTimeOnly) {
+                    database.priceAlertDao().setAlertEnabled(alert.id, false)
+                }
+
+                notificationManager?.sendPriceAlertNotification(
+                    alert = alert,
+                    currentPrice = currentPrice,
+                    oracleProvider = oracleData.oracleProvider
+                )
+
+                val conditionLabel = if (alert.condition == "ABOVE") "rises above" else "drops below"
+                database.notificationDao().insertNotification(
+                    NotificationEntity(
+                        title = "🪙 AGL Price Alert Triggered!",
+                        message = "AGL has hit $${"%.3f".format(currentPrice)} (Threshold: $conditionLabel $${"%.3f".format(alert.targetPriceUsd)}). Oracle: ${oracleData.oracleProvider}",
+                        type = "PRICE_ALERT",
+                        referenceId = "alert_${alert.id}_$now"
+                    )
+                )
+
+                triggered.add(alert.copy(isTriggered = true, lastTriggeredPriceUsd = currentPrice))
+            }
+        }
+        triggered
+    }
+
+    suspend fun testTriggerAlert(alertId: Long): Boolean = withContext(Dispatchers.IO) {
+        val alert = database.priceAlertDao().getAlertById(alertId) ?: return@withContext false
+        val oracleData = BlockchainService.aglPriceOracleService.getLatestCachedPrice()
+        val simulatedPrice = if (alert.condition == "ABOVE") {
+            alert.targetPriceUsd + 0.05
+        } else {
+            alert.targetPriceUsd - 0.05
+        }
+        val now = System.currentTimeMillis()
+        database.priceAlertDao().markAlertTriggered(alert.id, simulatedPrice, now)
+        notificationManager?.sendPriceAlertNotification(
+            alert = alert,
+            currentPrice = simulatedPrice,
+            oracleProvider = oracleData.oracleProvider
+        )
+        database.notificationDao().insertNotification(
+            NotificationEntity(
+                title = "🪙 AGL Price Alert Test Hit!",
+                message = "Test triggered: AGL threshold $${alert.targetPriceUsd} met with simulated price $${"%.3f".format(simulatedPrice)}.",
+                type = "PRICE_ALERT",
+                referenceId = "test_alert_${alert.id}"
+            )
+        )
+        true
     }
 }
 

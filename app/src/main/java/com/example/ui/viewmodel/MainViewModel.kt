@@ -4,11 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.entities.ChatMessageEntity
 import com.example.data.local.entities.NotificationEntity
+import com.example.data.local.entities.PriceAlertEntity
 import com.example.data.local.entities.RewardHistoryEntity
 import com.example.data.local.entities.UserProgressEntity
 import com.example.data.local.entities.WalletAccountEntity
 import com.example.data.model.AglEcosystemContract
 import com.example.data.model.AglEcosystemStats
+import com.example.data.model.AglOraclePriceData
 import com.example.data.model.AiSuggestion
 import com.example.data.model.AiSuggestionCategory
 import com.example.data.model.BaseTransaction
@@ -50,7 +52,8 @@ enum class AppScreen {
     SETTINGS,
     AI_ASSISTANT,
     QUESTS,
-    PROFILE
+    PROFILE,
+    PRICE_ALERTS
 }
 
 enum class AiSubTab {
@@ -116,7 +119,9 @@ data class UiState(
     val activeTxPipelineRequest: com.example.data.remote.blockchain.tx.TxPipelineRequest? = null,
     val txPipelineStatus: com.example.data.remote.blockchain.tx.TxStatus = com.example.data.remote.blockchain.tx.TxStatus.IDLE,
     val txExecutionResult: com.example.data.remote.blockchain.tx.TxExecutionResult? = null,
-    val showTxPipelineDialog: Boolean = false
+    val showTxPipelineDialog: Boolean = false,
+    val oraclePriceData: AglOraclePriceData = AglOraclePriceData(),
+    val isRefreshingOracle: Boolean = false
 )
 
 class MainViewModel(private val repository: AppRepository) : ViewModel() {
@@ -128,6 +133,9 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     val events: SharedFlow<String> = _events.asSharedFlow()
 
     val wallets: StateFlow<List<WalletAccountEntity>> = repository.allWallets
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val priceAlerts: StateFlow<List<PriceAlertEntity>> = repository.allPriceAlerts
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val transactions: StateFlow<List<BaseTransaction>> = repository.allTransactions
@@ -154,6 +162,12 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         viewModelScope.launch {
             repository.initializeSeedDataIfNeeded()
             loadInitialData()
+            refreshOraclePrice()
+            // Periodic background oracle price checking loop
+            while (true) {
+                kotlinx.coroutines.delay(20000)
+                refreshOraclePrice()
+            }
         }
     }
 
@@ -333,9 +347,24 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
-    fun castVote(proposalId: java.math.BigInteger, support: Int) {
-        val req = repository.getTxEngine().buildCastVote(proposalId, support)
+    fun castVote(proposalId: java.math.BigInteger, support: Int, reason: String? = null) {
+        val req = repository.getTxEngine().buildCastVote(proposalId, support, reason)
         startTxPipeline(req)
+    }
+
+    fun refreshGovernance() {
+        viewModelScope.launch {
+            val walletAddr = repository.getActiveWalletAddress()
+            val gov = repository.getGovernorDetails()
+            val props = repository.getGovernanceProposals(walletAddr)
+            _uiState.update {
+                it.copy(
+                    governorDetails = gov,
+                    proposals = props
+                )
+            }
+            showSnackbar("Governance proposals & on-chain state refreshed")
+        }
     }
 
     fun navigateToScreen(screen: AppScreen) {
@@ -716,5 +745,91 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
     fun clearSnackbar() {
         _uiState.update { it.copy(snackbarMessage = null) }
+    }
+
+    // Price Alert & Oracle Operations
+    fun refreshOraclePrice() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshingOracle = true) }
+            val res = repository.fetchOraclePrice()
+            _uiState.update { current ->
+                val newPriceData = res.getOrDefault(current.oraclePriceData)
+                current.copy(
+                    isRefreshingOracle = false,
+                    oraclePriceData = newPriceData,
+                    ecosystemStats = current.ecosystemStats.copy(
+                        currentPriceUsd = newPriceData.currentPriceUsd
+                    )
+                )
+            }
+        }
+    }
+
+    fun simulateOraclePrice(priceUsd: Double?) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshingOracle = true) }
+            val res = repository.simulateOraclePrice(priceUsd)
+            _uiState.update { current ->
+                val newPriceData = res.getOrDefault(current.oraclePriceData)
+                current.copy(
+                    isRefreshingOracle = false,
+                    oraclePriceData = newPriceData,
+                    ecosystemStats = current.ecosystemStats.copy(
+                        currentPriceUsd = newPriceData.currentPriceUsd
+                    )
+                )
+            }
+            val label = if (priceUsd != null) "$${"%.3f".format(priceUsd)}" else "Chainlink Live Feed"
+            showSnackbar("Oracle price updated to $label")
+        }
+    }
+
+    fun addPriceAlert(
+        targetPriceUsd: Double,
+        condition: String,
+        note: String,
+        oneTimeOnly: Boolean = false
+    ) {
+        viewModelScope.launch {
+            repository.addPriceAlert(
+                targetPriceUsd = targetPriceUsd,
+                condition = condition,
+                note = note,
+                oneTimeOnly = oneTimeOnly
+            )
+            showSnackbar("Price alert set for AGL at $${"%.3f".format(targetPriceUsd)} ($condition)")
+        }
+    }
+
+    fun togglePriceAlert(id: Long, enabled: Boolean) {
+        viewModelScope.launch {
+            repository.togglePriceAlert(id, enabled)
+            showSnackbar(if (enabled) "Alert enabled" else "Alert paused")
+        }
+    }
+
+    fun rearmPriceAlert(id: Long) {
+        viewModelScope.launch {
+            repository.rearmPriceAlert(id)
+            showSnackbar("Price alert re-armed and watching")
+        }
+    }
+
+    fun deletePriceAlert(id: Long) {
+        viewModelScope.launch {
+            repository.deletePriceAlert(id)
+            showSnackbar("Price alert removed")
+        }
+    }
+
+    fun testTriggerAlert(id: Long) {
+        viewModelScope.launch {
+            val success = repository.testTriggerAlert(id)
+            if (success) {
+                showSnackbar("Alert triggered! System notification sent.")
+            } else {
+                showSnackbar("Alert could not be found to trigger")
+            }
+        }
     }
 }

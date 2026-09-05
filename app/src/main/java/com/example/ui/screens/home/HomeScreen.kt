@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NorthEast
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
@@ -114,6 +115,14 @@ fun HomeScreen(
                 portfolioSummary = portfolioSummary,
                 onDailyCheckIn = onDailyCheckIn,
                 onViewWallet = { onNavigate(AppScreen.WALLET) }
+            )
+        }
+
+        item {
+            // AGL Oracle Price Alert Ticker Banner
+            AglPriceAlertTickerBanner(
+                price = ecosystemStats.currentPriceUsd,
+                onClick = { onNavigate(AppScreen.PRICE_ALERTS) }
             )
         }
 
@@ -773,6 +782,97 @@ fun RecentTransactionsSection(
                     TransactionRow(
                         transaction = tx,
                         onClick = { onSelectTransaction(tx) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AglPriceAlertTickerBanner(
+    price: Double,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .testTag("agl_price_alert_ticker_banner"),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkCard),
+        border = CardDefaults.outlinedCardBorder().copy(
+            brush = Brush.horizontalGradient(listOf(BaseCyan.copy(alpha = 0.5f), DarkBorder))
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    color = DarkCardElevated,
+                    shape = CircleShape,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.NotificationsActive,
+                            contentDescription = null,
+                            tint = BaseCyan,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "AGL Oracle: $${"%.3f".format(price)}",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(NeonEmerald)
+                        )
+                    }
+                    Text(
+                        text = "Chainlink Feed • Tap to set price thresholds",
+                        fontSize = 11.sp,
+                        color = TextSecondary
+                    )
+                }
+            }
+
+            Surface(
+                color = DarkBorderSubtle,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Alerts",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = BaseCyan
+                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = null,
+                        tint = BaseCyan,
+                        modifier = Modifier.size(14.dp)
                     )
                 }
             }

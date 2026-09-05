@@ -25,7 +25,16 @@ data class ProposalInfo(
     val forVotes: String,
     val againstVotes: String,
     val abstainVotes: String,
-    val endBlock: Long
+    val endBlock: Long,
+    val forVotesRaw: BigInteger = BigInteger.valueOf(3250000L).multiply(BigInteger.TEN.pow(18)),
+    val againstVotesRaw: BigInteger = BigInteger.valueOf(120000L).multiply(BigInteger.TEN.pow(18)),
+    val abstainVotesRaw: BigInteger = BigInteger.valueOf(45000L).multiply(BigInteger.TEN.pow(18)),
+    val proposer: String = "0xEA12...4698",
+    val targets: List<String> = listOf(BaseBlockchainConfig.AGL_CREDITS_CONTRACT),
+    val calldatasSummary: String = "setCreditRate(100000000000000000)",
+    val quorumVotes: BigInteger = BigInteger.valueOf(40000L).multiply(BigInteger.TEN.pow(18)),
+    val hasVoted: Boolean = false,
+    val userSupport: Int? = null
 )
 
 class GovernorService(
@@ -76,7 +85,37 @@ class GovernorService(
         }
     }
 
-    suspend fun getProposals(): Result<List<ProposalInfo>> {
+    suspend fun hasVoted(proposalId: BigInteger, account: String): Result<Boolean> {
+        return try {
+            val call = GovernorAbi.encodeHasVoted(proposalId, account)
+            rpcService.ethCall(contractAddress, call).map { hex ->
+                EvmCoder.decodeBool(hex)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getProposalVotes(proposalId: BigInteger): Result<Triple<BigInteger, BigInteger, BigInteger>> {
+        return try {
+            val call = GovernorAbi.encodeProposalVotes(proposalId)
+            rpcService.ethCall(contractAddress, call).map { hex ->
+                val clean = hex.removePrefix("0x")
+                if (clean.length >= 192) {
+                    val against = BigInteger(clean.substring(0, 64), 16)
+                    val `for` = BigInteger(clean.substring(64, 128), 16)
+                    val abstain = BigInteger(clean.substring(128, 192), 16)
+                    Triple(against, `for`, abstain)
+                } else {
+                    Triple(BigInteger.ZERO, BigInteger.ZERO, BigInteger.ZERO)
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getProposals(userAddress: String? = null): Result<List<ProposalInfo>> {
         return try {
             // Default active DAO proposals for Agunnaya DAO on Base Mainnet
             val defaultProposals = listOf(
@@ -88,7 +127,13 @@ class GovernorService(
                     forVotes = "3,250,000",
                     againstVotes = "120,000",
                     abstainVotes = "45,000",
-                    endBlock = 50850000L
+                    forVotesRaw = BigInteger.valueOf(3250000L).multiply(BigInteger.TEN.pow(18)),
+                    againstVotesRaw = BigInteger.valueOf(120000L).multiply(BigInteger.TEN.pow(18)),
+                    abstainVotesRaw = BigInteger.valueOf(45000L).multiply(BigInteger.TEN.pow(18)),
+                    endBlock = 50850000L,
+                    proposer = "0xEA1221B4d80A89BD8C75248Fae7c176BD1854698",
+                    targets = listOf(BaseBlockchainConfig.AGL_CREDITS_CONTRACT),
+                    calldatasSummary = "CreditsPool.subsidizeCompute(500000000000000000000000)"
                 ),
                 ProposalInfo(
                     id = "2",
@@ -98,7 +143,13 @@ class GovernorService(
                     forVotes = "4,890,000",
                     againstVotes = "80,000",
                     abstainVotes = "10,000",
-                    endBlock = 50620000L
+                    forVotesRaw = BigInteger.valueOf(4890000L).multiply(BigInteger.TEN.pow(18)),
+                    againstVotesRaw = BigInteger.valueOf(80000L).multiply(BigInteger.TEN.pow(18)),
+                    abstainVotesRaw = BigInteger.valueOf(10000L).multiply(BigInteger.TEN.pow(18)),
+                    endBlock = 50620000L,
+                    proposer = "0x51E283a0058b8849bB692C5535cE640B2D4696c7",
+                    targets = listOf(BaseBlockchainConfig.STAKING_CONTRACT),
+                    calldatasSummary = "StakingPool.createTier(365 days, 2400 bps)"
                 ),
                 ProposalInfo(
                     id = "3",
@@ -108,10 +159,44 @@ class GovernorService(
                     forVotes = "4,120,000",
                     againstVotes = "310,000",
                     abstainVotes = "50,000",
-                    endBlock = 50510000L
+                    forVotesRaw = BigInteger.valueOf(4120000L).multiply(BigInteger.TEN.pow(18)),
+                    againstVotesRaw = BigInteger.valueOf(310000L).multiply(BigInteger.TEN.pow(18)),
+                    abstainVotesRaw = BigInteger.valueOf(50000L).multiply(BigInteger.TEN.pow(18)),
+                    endBlock = 50510000L,
+                    proposer = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+                    targets = listOf(BaseBlockchainConfig.TIMELOCK_CONTRACT),
+                    calldatasSummary = "TimelockController.updateDelay(64800)"
                 )
             )
-            Result.success(defaultProposals)
+
+            // Attempt on-chain enrichment for proposal states and voter ballot status
+            val updatedProposals = defaultProposals.map { p ->
+                val pId = p.id.toBigIntegerOrNull() ?: BigInteger.ONE
+                var currentState = p.state
+                var currentHasVoted = p.hasVoted
+
+                // Query state on-chain
+                try {
+                    val onChainState = getProposalState(pId).getOrNull()
+                    if (onChainState != null) {
+                        currentState = onChainState
+                    }
+                } catch (_: Exception) {}
+
+                // Query user ballot on-chain
+                if (userAddress != null) {
+                    try {
+                        val voted = hasVoted(pId, userAddress).getOrNull()
+                        if (voted != null) {
+                            currentHasVoted = voted
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                p.copy(state = currentState, hasVoted = currentHasVoted)
+            }
+
+            Result.success(updatedProposals)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -119,6 +204,10 @@ class GovernorService(
 
     fun encodeCastVote(proposalId: BigInteger, support: Int): String {
         return GovernorAbi.encodeCastVote(proposalId, support)
+    }
+
+    fun encodeCastVoteWithReason(proposalId: BigInteger, support: Int, reason: String): String {
+        return GovernorAbi.encodeCastVoteWithReason(proposalId, support, reason)
     }
 
     fun encodeQueue(proposalId: BigInteger): String {

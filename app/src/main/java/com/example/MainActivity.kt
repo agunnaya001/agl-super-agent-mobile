@@ -25,6 +25,7 @@ import com.example.ui.components.AppTopBar
 import com.example.ui.components.TxPipelineDialog
 import com.example.ui.screens.agl.AglTokenScreen
 import com.example.ui.screens.ai.AIAssistantScreen
+import com.example.ui.screens.alerts.PriceAlertsScreen
 import com.example.ui.screens.credits.CreditsScreen
 import com.example.ui.screens.diagnostics.DiagnosticsScreen
 import com.example.ui.screens.governance.GovernanceScreen
@@ -48,6 +49,7 @@ import com.example.ui.viewmodel.AiSubTab
 import com.example.ui.viewmodel.AppScreen
 import com.example.ui.viewmodel.MainViewModel
 import com.example.ui.viewmodel.MainViewModelFactory
+import com.example.util.PriceAlertNotificationManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,12 +57,20 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val database = AppDatabase.getDatabase(applicationContext)
-        val repository = AppRepository(database)
+        val notificationManager = PriceAlertNotificationManager(applicationContext)
+        val repository = AppRepository(database, notificationManager)
         val viewModelFactory = MainViewModelFactory(repository)
+
+        val openScreenExtra = intent?.getStringExtra("OPEN_SCREEN")
 
         setContent {
             MyApplicationTheme {
                 val viewModel: MainViewModel = viewModel(factory = viewModelFactory)
+                LaunchedEffect(Unit) {
+                    if (openScreenExtra == "PRICE_ALERTS") {
+                        viewModel.navigateToScreen(AppScreen.PRICE_ALERTS)
+                    }
+                }
                 AglSuperAgentApp(viewModel = viewModel)
             }
         }
@@ -77,6 +87,7 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
     val rewardsHistory by viewModel.rewardsHistory.collectAsState()
     val notifications by viewModel.notifications.collectAsState()
     val userProgress by viewModel.userProgress.collectAsState()
+    val priceAlerts by viewModel.priceAlerts.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -231,7 +242,8 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
                         walletState = uiState.liveWalletState,
                         onBack = { viewModel.navigateToScreen(AppScreen.HOME) },
                         onStartTx = { req -> viewModel.startTxPipeline(req) },
-                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) },
+                        onOpenPriceAlerts = { viewModel.navigateToScreen(AppScreen.PRICE_ALERTS) }
                     )
                 }
 
@@ -273,9 +285,11 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
                         proposals = uiState.proposals,
                         walletState = uiState.liveWalletState,
                         onBack = { viewModel.navigateToScreen(AppScreen.HOME) },
-                        onVote = { id, support -> viewModel.castVote(id, support) },
+                        onVote = { id, support, reason -> viewModel.castVote(id, support, reason) },
                         onStartTx = { req -> viewModel.startTxPipeline(req) },
-                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) },
+                        onRefresh = { viewModel.refreshGovernance() },
+                        onNavigateToWagL = { viewModel.navigateToScreen(AppScreen.WAGL) }
                     )
                 }
 
@@ -333,6 +347,25 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
                         onOpenSettings = { viewModel.setShowSettingsDialog(true) },
                         onOpenNotifications = { viewModel.setShowNotificationDialog(true) },
                         onOpenSecurityPrinciples = { viewModel.setShowSecurityPrinciplesDialog(true) },
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
+                    )
+                }
+
+                AppScreen.PRICE_ALERTS -> {
+                    PriceAlertsScreen(
+                        oracleData = uiState.oraclePriceData,
+                        isRefreshingOracle = uiState.isRefreshingOracle,
+                        priceAlerts = priceAlerts,
+                        onBack = { viewModel.navigateToScreen(AppScreen.HOME) },
+                        onRefreshOracle = { viewModel.refreshOraclePrice() },
+                        onSimulatePrice = { price -> viewModel.simulateOraclePrice(price) },
+                        onAddAlert = { targetPrice, condition, note, oneTimeOnly ->
+                            viewModel.addPriceAlert(targetPrice, condition, note, oneTimeOnly)
+                        },
+                        onToggleAlert = { id, enabled -> viewModel.togglePriceAlert(id, enabled) },
+                        onRearmAlert = { id -> viewModel.rearmPriceAlert(id) },
+                        onDeleteAlert = { id -> viewModel.deletePriceAlert(id) },
+                        onTestTriggerAlert = { id -> viewModel.testTriggerAlert(id) },
                         onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
                     )
                 }

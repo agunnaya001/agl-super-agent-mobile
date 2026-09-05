@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NorthEast
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -37,6 +38,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -58,6 +60,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import com.example.ui.components.charts.TokenBalancePieChart
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -86,7 +89,8 @@ fun AglTokenScreen(
     walletState: LiveWalletState?,
     onBack: () -> Unit,
     onStartTx: (TxPipelineRequest) -> Unit,
-    onShowSnackbar: (String) -> Unit
+    onShowSnackbar: (String) -> Unit,
+    onOpenPriceAlerts: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
@@ -119,18 +123,48 @@ fun AglTokenScreen(
             // Top Bar
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "AGL Token Core",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "AGL Token Core",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
+
+                Surface(
+                    color = DarkCard,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .clickable { onOpenPriceAlerts() }
+                        .testTag("agl_token_open_price_alerts")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.NotificationsActive,
+                            contentDescription = null,
+                            tint = BaseCyan,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Price Alerts",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = BaseCyan
+                        )
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -281,6 +315,11 @@ fun AglTokenScreen(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
                     text = { Text("Burn", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                )
+                Tab(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
+                    text = { Text("Allocation", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -513,6 +552,21 @@ fun AglTokenScreen(
                             }
                         }
                     }
+                }
+            }
+
+            3 -> {
+                // Interactive Recharts-Style Token Balance Pie Chart
+                item {
+                    TokenBalancePieChart(
+                        walletAddress = walletState?.address ?: BaseBlockchainConfig.DEFAULT_DEMO_WALLET,
+                        title = "Token Balance Distribution",
+                        onSliceSelected = { slice ->
+                            if (slice != null) {
+                                onShowSnackbar("${slice.name}: ${slice.formattedBalance} (${slice.formattedValueUsd})")
+                            }
+                        }
+                    )
                 }
             }
         }
