@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 
 enum class AppScreen {
     HOME,
+    DASHBOARD,
     WALLET,
     AGL_TOKEN,
     CREDITS,
