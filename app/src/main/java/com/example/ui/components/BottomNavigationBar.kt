@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
@@ -56,6 +58,13 @@ fun AppBottomNavigationBar(
             selectedIcon = Icons.Filled.Home,
             unselectedIcon = Icons.Outlined.Home,
             testTag = "nav_home"
+        ),
+        NavItem(
+            screen = AppScreen.DASHBOARD,
+            label = "Monitor",
+            selectedIcon = Icons.Filled.Dashboard,
+            unselectedIcon = Icons.Outlined.Dashboard,
+            testTag = "nav_dashboard"
         ),
         NavItem(
             screen = AppScreen.WALLET,

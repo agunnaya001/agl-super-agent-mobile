@@ -25,6 +25,7 @@ import com.example.ui.components.AppTopBar
 import com.example.ui.components.TxPipelineDialog
 import com.example.ui.screens.agl.AglTokenScreen
 import com.example.ui.screens.ai.AIAssistantScreen
+import com.example.ui.screens.dashboard.DashboardScreen
 import com.example.ui.screens.alerts.PriceAlertsScreen
 import com.example.ui.screens.credits.CreditsScreen
 import com.example.ui.screens.diagnostics.DiagnosticsScreen
@@ -149,6 +150,28 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
                         isIndexingTransactions = uiState.isIndexingTransactions,
                         indexerStatus = uiState.indexerStatusMessage,
                         onRefreshTransactions = { viewModel.refreshRecentTransactions() },
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
+                    )
+                }
+
+                AppScreen.DASHBOARD -> {
+                    DashboardScreen(
+                        activeWalletAddress = uiState.activeWalletAddress,
+                        isConnected = uiState.isConnected,
+                        networkDiagnostics = uiState.networkDiagnostics,
+                        isRunningDiagnostics = uiState.isRunningDiagnostics,
+                        oraclePriceData = uiState.oraclePriceData,
+                        isRefreshingOracle = uiState.isRefreshingOracle,
+                        ecosystemStats = uiState.ecosystemStats,
+                        isAiThinking = uiState.isAiThinking,
+                        isIndexingTransactions = uiState.isIndexingTransactions,
+                        indexerStatusMessage = uiState.indexerStatusMessage,
+                        transactions = transactions,
+                        notifications = notifications,
+                        userProgress = userProgress,
+                        onRefresh = { viewModel.refreshData() },
+                        onRunDiagnostics = { viewModel.runNetworkDiagnostics() },
+                        onNavigate = { screen -> viewModel.navigateToScreen(screen) },
                         onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
                     )
                 }
