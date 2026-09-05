@@ -78,25 +78,10 @@ class WalletService(
         var ethWei = ethDeferred.await()
         var aglWei = aglDeferred.await()
         val wAglInfo = wAglInfoDeferred.await()
-        var creditsWei = creditsDeferred.await()
+        val creditsWei = creditsDeferred.await()
 
-        var wAglWei = wAglInfo?.wAglBalance ?: BigInteger.ZERO
-        var votingWei = wAglInfo?.votingPower ?: BigInteger.ZERO
-
-        val isDemo = walletAddress.equals(BaseBlockchainConfig.DEFAULT_DEMO_WALLET, ignoreCase = true)
-        if (isDemo && aglWei == BigInteger.ZERO) {
-            aglWei = BigInteger("1250450000000000000000") // 1,250.45 AGL
-        }
-        if (isDemo && wAglWei == BigInteger.ZERO) {
-            wAglWei = BigInteger("250000000000000000000") // 250.00 wAGL
-            votingWei = BigInteger("250000000000000000000") // 250.00 voting power
-        }
-        if (isDemo && ethWei == BigInteger.ZERO) {
-            ethWei = BigInteger("450000000000000000") // 0.45 ETH
-        }
-        if (isDemo && creditsWei == BigInteger.ZERO) {
-            creditsWei = BigInteger("1420000000000000000000") // 1,420 Credits
-        }
+        val wAglWei = wAglInfo?.wAglBalance ?: BigInteger.ZERO
+        val votingWei = wAglInfo?.votingPower ?: BigInteger.ZERO
 
         LiveWalletState(
             address = walletAddress,

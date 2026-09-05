@@ -1,11 +1,39 @@
 package com.example.data.remote.blockchain.abi
 
+import org.web3j.crypto.Hash
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.RoundingMode
 import java.nio.charset.StandardCharsets
 
 object EvmCoder {
+
+    /**
+     * Computes the Keccak-256 hash of a UTF-8 string or byte array.
+     */
+    fun keccak256(input: ByteArray): ByteArray {
+        return Hash.sha3(input)
+    }
+
+    /**
+     * Computes the standard 4-byte EVM function selector for a function signature.
+     * E.g. functionSelector("balanceOf(address)") -> "0x70a08231"
+     */
+    fun functionSelector(signature: String): String {
+        val hash = Hash.sha3(signature.toByteArray(StandardCharsets.UTF_8))
+        val hex = hash.take(4).joinToString("") { "%02x".format(it) }
+        return "0x$hex"
+    }
+
+    /**
+     * Computes the standard 32-byte EVM event topic for an event signature.
+     * E.g. eventTopic("Transfer(address,address,uint256)")
+     */
+    fun eventTopic(signature: String): String {
+        val hash = Hash.sha3(signature.toByteArray(StandardCharsets.UTF_8))
+        val hex = hash.joinToString("") { "%02x".format(it) }
+        return "0x$hex"
+    }
 
     fun cleanHex(hex: String): String {
         return if (hex.startsWith("0x", ignoreCase = true)) {

@@ -10,6 +10,7 @@ object BaseBlockchainConfig {
     const val EXPLORER_BASE_URL = "https://basescan.org"
 
     // Multi-RPC resilient endpoints with automatic failover
+    const val PRIMARY_RPC = "https://mainnet.base.org"
     val RPC_ENDPOINTS = listOf(
         "https://mainnet.base.org",
         "https://base-rpc.publicnode.com",
@@ -22,6 +23,7 @@ object BaseBlockchainConfig {
     const val AGL_TOKEN_CONTRACT = "0xEA1221B4d80A89BD8C75248Fae7c176BD1854698"
     const val AGL_CREDITS_CONTRACT = "0x13866F31c60822Ff70684213b9727915Ddf2c183"
     const val AGL_VOTES_WRAPPER_CONTRACT = "0xA27C9BA04D06EcAF766EF4e074b403DAf19A3d69"
+    const val STAKING_CONTRACT = "0xd4B61B4876c15e78e0275EbA52cf62D55ED5fD30"
     const val GOVERNOR_CONTRACT = "0x3fFCb92A17caeaAd1342DD76978b566C8aEC7010"
     const val TIMELOCK_CONTRACT = "0x900D315C91D9e54F3fa3412D475009d905bf6744"
     const val DEFAULT_DEMO_WALLET = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
@@ -65,6 +67,17 @@ object BaseBlockchainConfig {
             verified = true,
             type = "ERC20Votes Wrapper",
             iconEmoji = "🗳️"
+        ),
+        AglEcosystemContract(
+            id = "agl_staking",
+            name = "AGL Staking",
+            purpose = "Time-locked yield staking, reward pool distribution, and tier management",
+            contractAddress = STAKING_CONTRACT,
+            network = NETWORK_NAME,
+            status = "Active",
+            verified = true,
+            type = "Staking Pool",
+            iconEmoji = "💎"
         ),
         AglEcosystemContract(
             id = "agl_governor",

@@ -22,7 +22,12 @@ import com.example.data.local.AppDatabase
 import com.example.data.repository.AppRepository
 import com.example.ui.components.AppBottomNavigationBar
 import com.example.ui.components.AppTopBar
+import com.example.ui.components.TxPipelineDialog
+import com.example.ui.screens.agl.AglTokenScreen
 import com.example.ui.screens.ai.AIAssistantScreen
+import com.example.ui.screens.credits.CreditsScreen
+import com.example.ui.screens.diagnostics.DiagnosticsScreen
+import com.example.ui.screens.governance.GovernanceScreen
 import com.example.ui.screens.home.HomeScreen
 import com.example.ui.screens.profile.AddWalletDialog
 import com.example.ui.screens.profile.NotificationCenterDialog
@@ -31,6 +36,9 @@ import com.example.ui.screens.profile.SecurityPrinciplesDialog
 import com.example.ui.screens.profile.SettingsDialog
 import com.example.ui.screens.quests.LessonDetailDialog
 import com.example.ui.screens.quests.QuestsScreen
+import com.example.ui.screens.staking.StakingScreen
+import com.example.ui.screens.timelock.TimelockScreen
+import com.example.ui.screens.wagl.WagLScreen
 import com.example.ui.screens.wallet.ConnectWalletDialog
 import com.example.ui.screens.wallet.TransactionDetailSheet
 import com.example.ui.screens.wallet.WalletScreen
@@ -216,6 +224,118 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
                         onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
                     )
                 }
+
+                AppScreen.AGL_TOKEN -> {
+                    AglTokenScreen(
+                        metadata = uiState.tokenMetadata,
+                        walletState = uiState.liveWalletState,
+                        onBack = { viewModel.navigateToScreen(AppScreen.HOME) },
+                        onStartTx = { req -> viewModel.startTxPipeline(req) },
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
+                    )
+                }
+
+                AppScreen.CREDITS -> {
+                    CreditsScreen(
+                        creditsInfo = uiState.creditsInfo,
+                        walletState = uiState.liveWalletState,
+                        onBack = { viewModel.navigateToScreen(AppScreen.HOME) },
+                        onStartTx = { req -> viewModel.startTxPipeline(req) },
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
+                    )
+                }
+
+                AppScreen.WAGL -> {
+                    WagLScreen(
+                        wAglInfo = uiState.wagLInfo,
+                        walletState = uiState.liveWalletState,
+                        onBack = { viewModel.navigateToScreen(AppScreen.HOME) },
+                        onStartTx = { req -> viewModel.startTxPipeline(req) },
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
+                    )
+                }
+
+                AppScreen.STAKING -> {
+                    StakingScreen(
+                        stakingInfo = uiState.stakingInfo,
+                        tiers = uiState.stakingTiers,
+                        positions = uiState.stakingPositions,
+                        walletState = uiState.liveWalletState,
+                        onBack = { viewModel.navigateToScreen(AppScreen.HOME) },
+                        onStartTx = { req -> viewModel.startTxPipeline(req) },
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
+                    )
+                }
+
+                AppScreen.GOVERNANCE -> {
+                    GovernanceScreen(
+                        governorDetails = uiState.governorDetails,
+                        proposals = uiState.proposals,
+                        walletState = uiState.liveWalletState,
+                        onBack = { viewModel.navigateToScreen(AppScreen.HOME) },
+                        onVote = { id, support -> viewModel.castVote(id, support) },
+                        onStartTx = { req -> viewModel.startTxPipeline(req) },
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
+                    )
+                }
+
+                AppScreen.TIMELOCK -> {
+                    TimelockScreen(
+                        timelockInfo = uiState.timelockInfo,
+                        onBack = { viewModel.navigateToScreen(AppScreen.HOME) },
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
+                    )
+                }
+
+                AppScreen.DIAGNOSTICS -> {
+                    DiagnosticsScreen(
+                        report = uiState.networkDiagnostics,
+                        isRunning = uiState.isRunningDiagnostics,
+                        onBack = { viewModel.navigateToScreen(AppScreen.HOME) },
+                        onRunDiagnostics = { viewModel.runNetworkDiagnostics() },
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
+                    )
+                }
+
+                AppScreen.ACTIVITY -> {
+                    WalletScreen(
+                        activeWalletAddress = uiState.activeWalletAddress,
+                        liveWalletState = uiState.liveWalletState,
+                        isFetchingLiveBalances = uiState.isFetchingLiveBalances,
+                        portfolioSummary = uiState.portfolioSummary,
+                        tokens = uiState.tokens,
+                        transactions = transactions,
+                        wallets = wallets,
+                        onSwitchWallet = { addr -> viewModel.switchActiveWallet(addr) },
+                        onConnectWalletClick = { viewModel.setShowConnectWalletDialog(true) },
+                        onDisconnectWallet = { viewModel.disconnectWallet() },
+                        onAddWalletClick = { viewModel.setShowAddWalletDialog(true) },
+                        onRefresh = { viewModel.refreshData() },
+                        onSelectTransaction = { tx -> viewModel.setSelectedTransaction(tx) },
+                        onExplainTxWithAi = { tx ->
+                            viewModel.setSelectedTransaction(tx)
+                            viewModel.setAiSubTab(AiSubTab.CHAT)
+                            viewModel.navigateToScreen(AppScreen.AI_ASSISTANT)
+                            viewModel.sendChatMessage("Explain transaction ${tx.hash.take(12)}... in simple terms.")
+                        },
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) },
+                        isIndexingTransactions = uiState.isIndexingTransactions,
+                        indexerStatus = uiState.indexerStatusMessage,
+                        onRefreshTransactions = { viewModel.refreshRecentTransactions() }
+                    )
+                }
+
+                AppScreen.SETTINGS -> {
+                    ProfileScreen(
+                        userProfile = uiState.userProfile,
+                        wallets = wallets,
+                        onAddWalletClick = { viewModel.setShowAddWalletDialog(true) },
+                        onOpenSettings = { viewModel.setShowSettingsDialog(true) },
+                        onOpenNotifications = { viewModel.setShowNotificationDialog(true) },
+                        onOpenSecurityPrinciples = { viewModel.setShowSecurityPrinciplesDialog(true) },
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
+                    )
+                }
             }
 
             // Transaction Detail Bottom Sheet
@@ -290,6 +410,18 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
             if (uiState.showSecurityPrinciplesDialog) {
                 SecurityPrinciplesDialog(
                     onDismiss = { viewModel.setShowSecurityPrinciplesDialog(false) }
+                )
+            }
+
+            // Transaction Pipeline & Approval Dialog
+            if (uiState.showTxPipelineDialog) {
+                TxPipelineDialog(
+                    request = uiState.activeTxPipelineRequest,
+                    status = uiState.txPipelineStatus,
+                    executionResult = uiState.txExecutionResult,
+                    onDismiss = { viewModel.dismissTxPipeline() },
+                    onApprove = { viewModel.approveSpenderForActiveTx() },
+                    onConfirm = { viewModel.confirmAndExecuteTx() }
                 )
             }
         }

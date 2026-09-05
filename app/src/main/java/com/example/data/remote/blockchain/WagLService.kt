@@ -152,13 +152,14 @@ class WagLService(
 
     /**
      * Reads the underlying token contract address wrapped by this contract.
-     * Function selector: 0xfc0c546a (token() -> address)
+     * Tries `underlying()` first, then falls back to `token()`.
      */
     suspend fun getUnderlyingTokenAddress(): Result<String> {
-        val result = rpcService.ethCall(contractAddress, VotesWrapperAbi.SELECTOR_TOKEN)
-        return result.map { hex ->
-            EvmCoder.decodeAddress(hex) ?: BaseBlockchainConfig.AGL_TOKEN_CONTRACT
-        }
+        val underlyingRes = rpcService.ethCall(contractAddress, VotesWrapperAbi.SELECTOR_UNDERLYING).getOrNull()
+        val addr = EvmCoder.decodeAddress(underlyingRes)
+            ?: rpcService.ethCall(contractAddress, VotesWrapperAbi.SELECTOR_TOKEN).map { EvmCoder.decodeAddress(it) }.getOrNull()
+            ?: BaseBlockchainConfig.AGL_TOKEN_CONTRACT
+        return Result.success(addr)
     }
 
     /**

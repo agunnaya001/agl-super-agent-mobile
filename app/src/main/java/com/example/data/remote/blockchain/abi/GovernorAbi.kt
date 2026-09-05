@@ -22,13 +22,21 @@ object GovernorAbi {
     const val SELECTOR_CAST_VOTE_WITH_REASON = "0x7b3c71d3" // castVoteWithReason(uint256,uint8,string) -> uint256
     const val SELECTOR_QUEUE = "0x3e649f87" // queue(address[],uint256[],bytes[],bytes32) -> uint256
     const val SELECTOR_EXECUTE = "0xfe0d94c1" // execute(address[],uint256[],bytes[],bytes32) -> uint256
+    val SELECTOR_HAS_VOTED = EvmCoder.functionSelector("hasVoted(uint256,address)")
+    val SELECTOR_PROPOSAL_PROPOSER = EvmCoder.functionSelector("proposalProposer(uint256)")
+    val SELECTOR_PROPOSAL_THRESHOLD = EvmCoder.functionSelector("proposalThreshold()")
+    val SELECTOR_VERSION = EvmCoder.functionSelector("version()")
+    val SELECTOR_CLOCK = EvmCoder.functionSelector("clock()")
 
     // Topics
     const val TOPIC_PROPOSAL_CREATED = "0x7d84a6263ae0d98d3329bd7b46bb4e8d6f98cd35a7adb45c274c8b7fd5ebd5e0"
     const val TOPIC_VOTE_CAST = "0xb8e138887d0c310a08e1e7a5c711019623e852924510006240d0499c894bf4f7"
+    val TOPIC_VOTE_CAST_WITH_PARAMS = EvmCoder.eventTopic("VoteCastWithParams(address,uint256,uint8,uint256,string,bytes)")
     const val TOPIC_PROPOSAL_QUEUED = "0x9a2e420136fe69c0634674004da3373b9e4a39031c2cd60f64c67eb0155b4104"
     const val TOPIC_PROPOSAL_EXECUTED = "0x7128f09579d72bc2d0808280b271d43144a66a7b6cf7a9b0c265696d5a15998a"
     const val TOPIC_PROPOSAL_CANCELED = "0x789cf0c1e59ca16832b070082320310aaf1472997142224d237fb321a370f680"
+    val TOPIC_QUORUM_NUMERATOR_UPDATED = EvmCoder.eventTopic("QuorumNumeratorUpdated(uint256,uint256)")
+    val TOPIC_TIMELOCK_CHANGE = EvmCoder.eventTopic("TimelockChange(address,address)")
 
     enum class ProposalState(val code: Int, val label: String) {
         PENDING(0, "Pending"),

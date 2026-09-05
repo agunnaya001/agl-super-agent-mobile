@@ -161,8 +161,21 @@ fun HomeScreen(
                 stats = ecosystemStats,
                 contracts = ecosystemContracts,
                 onExploreContract = { contract ->
-                    onNavigateAiTab(AiSubTab.CONTRACT_ANALYZER)
-                    onNavigate(AppScreen.AI_ASSISTANT)
+                    when (contract.id) {
+                        "agl_token" -> onNavigate(AppScreen.AGL_TOKEN)
+                        "agl_credits" -> onNavigate(AppScreen.CREDITS)
+                        "agl_votes" -> onNavigate(AppScreen.WAGL)
+                        "agl_staking" -> onNavigate(AppScreen.STAKING)
+                        "agl_governor" -> onNavigate(AppScreen.GOVERNANCE)
+                        "agl_timelock" -> onNavigate(AppScreen.TIMELOCK)
+                        else -> {
+                            onNavigateAiTab(AiSubTab.CONTRACT_ANALYZER)
+                            onNavigate(AppScreen.AI_ASSISTANT)
+                        }
+                    }
+                },
+                onOpenDiagnostics = {
+                    onNavigate(AppScreen.DIAGNOSTICS)
                 }
             )
         }
@@ -454,7 +467,8 @@ fun QuickActionItem(
 fun AglEcosystemBanner(
     stats: AglEcosystemStats,
     contracts: List<AglEcosystemContract>,
-    onExploreContract: (AglEcosystemContract) -> Unit
+    onExploreContract: (AglEcosystemContract) -> Unit,
+    onOpenDiagnostics: () -> Unit = {}
 ) {
     Column {
         Row(
@@ -468,11 +482,29 @@ fun AglEcosystemBanner(
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary
             )
-            Text(
-                text = "Chain ID 8453",
-                fontSize = 12.sp,
-                color = BaseCyan
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(BaseBlue.copy(alpha = 0.25f))
+                        .border(1.dp, BaseCyan.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                        .clickable { onOpenDiagnostics() }
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = "⚡ Diagnostics",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = BaseCyan
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Chain 8453",
+                    fontSize = 11.sp,
+                    color = NeonEmerald
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(10.dp))

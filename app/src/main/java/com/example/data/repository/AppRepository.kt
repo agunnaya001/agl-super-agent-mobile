@@ -650,6 +650,58 @@ class AppRepository(private val database: AppDatabase) {
             )
         )
     }
+
+    // =========================================================================
+    // Ecosystem Contracts Data Layer
+    // =========================================================================
+
+    suspend fun getAglTokenMetadata() = withContext(Dispatchers.IO) {
+        BlockchainService.aglTokenService.getMetadata().getOrNull()
+    }
+
+    suspend fun getCreditsInfo(address: String) = withContext(Dispatchers.IO) {
+        BlockchainService.aglCreditsService.getCreditsInfo(address).getOrNull()
+    }
+
+    suspend fun previewCredits(amountAglWei: java.math.BigInteger) = withContext(Dispatchers.IO) {
+        BlockchainService.aglCreditsService.previewCredits(amountAglWei).getOrNull()
+    }
+
+    suspend fun getWagLInfo(address: String) = withContext(Dispatchers.IO) {
+        BlockchainService.wagLService.getAccountInfo(address).getOrNull()
+    }
+
+    suspend fun getStakingInfo() = withContext(Dispatchers.IO) {
+        BlockchainService.aglStakingService.getStakingInfo().getOrNull()
+    }
+
+    suspend fun getStakingTiers() = withContext(Dispatchers.IO) {
+        BlockchainService.aglStakingService.getStakingTiers().getOrDefault(emptyList())
+    }
+
+    suspend fun getUserStakingPositions(address: String) = withContext(Dispatchers.IO) {
+        BlockchainService.aglStakingService.getUserPositions(address).getOrDefault(emptyList())
+    }
+
+    suspend fun getGovernorDetails() = withContext(Dispatchers.IO) {
+        BlockchainService.governorService.getGovernorDetails().getOrNull()
+    }
+
+    suspend fun getGovernanceProposals() = withContext(Dispatchers.IO) {
+        BlockchainService.governorService.getProposals().getOrDefault(emptyList())
+    }
+
+    suspend fun getTimelockInfo() = withContext(Dispatchers.IO) {
+        BlockchainService.timelockService.getTimelockInfo().getOrNull()
+    }
+
+    suspend fun runDiagnostics() = withContext(Dispatchers.IO) {
+        BlockchainService.verifier.runFullDiagnostics()
+    }
+
+    fun getTxEngine(): com.example.data.remote.blockchain.tx.TransactionPipelineEngine {
+        return BlockchainService.txEngine
+    }
 }
 
 // Extension mappers

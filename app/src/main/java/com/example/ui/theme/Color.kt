@@ -11,6 +11,7 @@ val NeonEmerald = Color(0xFF00E699)
 val RadiantPurple = Color(0xFF8B5CF6)
 val AmberWarning = Color(0xFFFFB020)
 val DangerCrimson = Color(0xFFFF453A)
+val NeonRose = Color(0xFFFF3366)
 val GoldRewards = Color(0xFFFFD700)
 
 // Surfaces & Backgrounds (Modern High-Contrast Dark)

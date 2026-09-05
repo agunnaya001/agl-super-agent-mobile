@@ -126,6 +126,31 @@ class AglTokenService(
     }
 
     /**
+     * Encodes calldata for burn(uint256).
+     */
+    fun encodeBurnData(amount: BigInteger): String {
+        return Erc20Abi.encodeBurn(amount)
+    }
+
+    /**
+     * Fetches contract owner address if applicable.
+     */
+    suspend fun getOwner(): Result<String> {
+        val result = rpcService.ethCall(contractAddress, Erc20Abi.SELECTOR_OWNER)
+        return result.map { hex ->
+            EvmCoder.decodeAddress(hex) ?: BaseBlockchainConfig.TIMELOCK_CONTRACT
+        }
+    }
+
+    fun encodeTransferOwnershipData(newOwner: String): String {
+        return Erc20Abi.encodeTransferOwnership(newOwner)
+    }
+
+    fun encodeRenounceOwnershipData(): String {
+        return Erc20Abi.encodeRenounceOwnership()
+    }
+
+    /**
      * Fetches complete metadata (name, symbol, decimals, totalSupply) in a coordinated query.
      */
     suspend fun getMetadata(): Result<TokenMetadata> {

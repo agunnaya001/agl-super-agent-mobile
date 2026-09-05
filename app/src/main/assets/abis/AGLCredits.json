@@ -1,0 +1,22 @@
+[
+  {"type":"function","name":"BURN_ADDRESS","inputs":[],"outputs":[{"name":"","type":"address"}],"stateMutability":"view"},
+  {"type":"function","name":"aglToken","inputs":[],"outputs":[{"name":"","type":"address"}],"stateMutability":"view"},
+  {"type":"function","name":"creditsPerAGL","inputs":[],"outputs":[{"name":"","type":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"owner","inputs":[],"outputs":[{"name":"","type":"address"}],"stateMutability":"view"},
+  {"type":"function","name":"paused","inputs":[],"outputs":[{"name":"","type":"bool"}],"stateMutability":"view"},
+  {"type":"function","name":"previewCredits","inputs":[{"name":"amount","type":"uint256"}],"outputs":[{"name":"","type":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"totalAGLBurned","inputs":[],"outputs":[{"name":"","type":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"totalAGLBurnedBy","inputs":[{"name":"account","type":"address"}],"outputs":[{"name":"","type":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"totalCreditsPurchased","inputs":[{"name":"account","type":"address"}],"outputs":[{"name":"","type":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"purchaseCredits","inputs":[{"name":"amount","type":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"setCreditsPerAGL","inputs":[{"name":"rate","type":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"pause","inputs":[],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"unpause","inputs":[],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"transferOwnership","inputs":[{"name":"newOwner","type":"address"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"renounceOwnership","inputs":[],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"event","name":"CreditsPurchased","inputs":[{"name":"buyer","type":"address","indexed":true},{"name":"amountAGL","type":"uint256","indexed":false},{"name":"creditsReceived","type":"uint256","indexed":false}]},
+  {"type":"event","name":"RateUpdated","inputs":[{"name":"newRate","type":"uint256","indexed":false}]},
+  {"type":"event","name":"Paused","inputs":[{"name":"account","type":"address","indexed":false}]},
+  {"type":"event","name":"Unpaused","inputs":[{"name":"account","type":"address","indexed":false}]},
+  {"type":"event","name":"OwnershipTransferred","inputs":[{"name":"previousOwner","type":"address","indexed":true},{"name":"newOwner","type":"address","indexed":true}]}
+]

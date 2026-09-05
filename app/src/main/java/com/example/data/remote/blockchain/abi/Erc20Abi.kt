@@ -18,6 +18,25 @@ object Erc20Abi {
     // Topics
     const val TOPIC_TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
     const val TOPIC_APPROVAL = "0x8c5be1e5eb7d556b1f0b42c779857777b8d4239775f5e2f5b666958449e6a887"
+    val TOPIC_OWNERSHIP_TRANSFERRED = EvmCoder.eventTopic("OwnershipTransferred(address,address)")
+
+    val SELECTOR_BURN = EvmCoder.functionSelector("burn(uint256)")
+    val SELECTOR_OWNER = EvmCoder.functionSelector("owner()")
+    val SELECTOR_TOTAL_SUPPLY_UPPER = EvmCoder.functionSelector("TOTAL_SUPPLY()")
+    val SELECTOR_TRANSFER_OWNERSHIP = EvmCoder.functionSelector("transferOwnership(address)")
+    val SELECTOR_RENOUNCE_OWNERSHIP = EvmCoder.functionSelector("renounceOwnership()")
+
+    fun encodeBurn(amount: BigInteger): String {
+        return SELECTOR_BURN + EvmCoder.encodeUint256(amount)
+    }
+
+    fun encodeTransferOwnership(newOwner: String): String {
+        return SELECTOR_TRANSFER_OWNERSHIP + EvmCoder.encodeAddress(newOwner)
+    }
+
+    fun encodeRenounceOwnership(): String {
+        return SELECTOR_RENOUNCE_OWNERSHIP
+    }
 
     fun encodeBalanceOf(account: String): String {
         return SELECTOR_BALANCE_OF + EvmCoder.encodeAddress(account)

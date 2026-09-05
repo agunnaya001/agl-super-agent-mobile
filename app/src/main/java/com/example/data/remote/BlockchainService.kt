@@ -41,6 +41,7 @@ object BlockchainService {
     const val AGL_TOKEN_CONTRACT = BaseBlockchainConfig.AGL_TOKEN_CONTRACT
     const val AGL_CREDITS_CONTRACT = BaseBlockchainConfig.AGL_CREDITS_CONTRACT
     const val AGL_VOTES_WRAPPER_CONTRACT = BaseBlockchainConfig.AGL_VOTES_WRAPPER_CONTRACT
+    const val STAKING_CONTRACT = BaseBlockchainConfig.STAKING_CONTRACT
     const val GOVERNOR_CONTRACT = BaseBlockchainConfig.GOVERNOR_CONTRACT
     const val TIMELOCK_CONTRACT = BaseBlockchainConfig.TIMELOCK_CONTRACT
 
@@ -49,8 +50,11 @@ object BlockchainService {
     val aglTokenService = AglTokenService(rpcService)
     val aglCreditsService = AglCreditsService(rpcService)
     val wagLService = WagLService(rpcService)
+    val aglStakingService = com.example.data.remote.blockchain.AglStakingService(rpcService)
     val governorService = GovernorService(rpcService)
     val timelockService = TimelockService(rpcService)
+    val verifier = com.example.data.remote.blockchain.diagnostics.ContractRelationshipVerifier(rpcService)
+    val txEngine = com.example.data.remote.blockchain.tx.TransactionPipelineEngine(rpcService)
     val walletService = WalletService(rpcService, aglTokenService, wagLService, aglCreditsService)
     val transactionIndexerService = BaseTransactionIndexerService()
     val transactionAiSummarizer = TransactionAiSummarizer()

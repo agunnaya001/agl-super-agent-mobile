@@ -26,6 +26,11 @@ data class AglCreditsInfo(
     val aglTokenAddress: String?,
     val isPaused: Boolean,
     val burnAddress: String?,
+    val creditsPerAgl: BigInteger,
+    val totalAglBurned: BigInteger,
+    val formattedTotalAglBurned: String,
+    val userAglBurned: BigInteger,
+    val formattedUserAglBurned: String,
     val userCreditsPurchased: BigInteger,
     val formattedUserCredits: String
 )
@@ -57,13 +62,20 @@ class AglCreditsService(
             val aglRes = rpcService.ethCall(contractAddress, CreditsAbi.SELECTOR_AGL_TOKEN).getOrNull()
             val pausedRes = rpcService.ethCall(contractAddress, CreditsAbi.SELECTOR_PAUSED).getOrNull()
             val burnRes = rpcService.ethCall(contractAddress, CreditsAbi.SELECTOR_BURN_ADDRESS).getOrNull()
+            val rateRes = rpcService.ethCall(contractAddress, CreditsAbi.SELECTOR_CREDITS_PER_AGL).getOrNull()
+            val totalBurnRes = rpcService.ethCall(contractAddress, CreditsAbi.SELECTOR_TOTAL_AGL_BURNED).getOrNull()
 
-            val userCredits = if (!userAddress.isNullOrBlank()) {
+            val rate = EvmCoder.decodeUint256(rateRes).takeIf { it > BigInteger.ZERO } ?: BigInteger.valueOf(100)
+            val totalBurned = EvmCoder.decodeUint256(totalBurnRes)
+
+            val (userCredits, userBurned) = if (!userAddress.isNullOrBlank()) {
                 val call = CreditsAbi.encodeTotalCreditsPurchased(userAddress)
                 val res = rpcService.ethCall(contractAddress, call).getOrNull()
-                EvmCoder.decodeUint256(res)
+                val burnedCall = CreditsAbi.encodeTotalAglBurnedBy(userAddress)
+                val burnedRes = rpcService.ethCall(contractAddress, burnedCall).getOrNull()
+                Pair(EvmCoder.decodeUint256(res), EvmCoder.decodeUint256(burnedRes))
             } else {
-                BigInteger.ZERO
+                Pair(BigInteger.ZERO, BigInteger.ZERO)
             }
 
             val info = AglCreditsInfo(
@@ -72,12 +84,24 @@ class AglCreditsService(
                 aglTokenAddress = EvmCoder.decodeAddress(aglRes) ?: BaseBlockchainConfig.AGL_TOKEN_CONTRACT,
                 isPaused = EvmCoder.decodeBool(pausedRes),
                 burnAddress = EvmCoder.decodeAddress(burnRes),
+                creditsPerAgl = rate,
+                totalAglBurned = totalBurned,
+                formattedTotalAglBurned = "${EvmCoder.formatUnits(totalBurned, 18, 2)} AGL",
+                userAglBurned = userBurned,
+                formattedUserAglBurned = "${EvmCoder.formatUnits(userBurned, 18, 2)} AGL",
                 userCreditsPurchased = userCredits,
                 formattedUserCredits = EvmCoder.formatUnits(userCredits, 18, 2)
             )
             Result.success(info)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    suspend fun previewCredits(amountAglWei: BigInteger): Result<BigInteger> {
+        val call = CreditsAbi.encodePreviewCredits(amountAglWei)
+        return rpcService.ethCall(contractAddress, call).map { hex ->
+            EvmCoder.decodeUint256(hex)
         }
     }
 
