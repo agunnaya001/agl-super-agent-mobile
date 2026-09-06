@@ -83,6 +83,20 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import java.math.BigInteger
 
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import com.example.data.remote.blockchain.services.DexAggregatorService
+import com.example.data.remote.blockchain.services.DexQuote
+import com.example.data.remote.blockchain.services.SwapToken
+import com.example.ui.components.TokenLogoComponent
+import kotlinx.coroutines.launch
+
 @Composable
 fun AglTokenScreen(
     metadata: TokenMetadata?,
@@ -94,7 +108,7 @@ fun AglTokenScreen(
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Swap, 1: Transfer, 2: Approve, 3: Burn, 4: Allocation
 
     // Form states
     var transferRecipient by remember { mutableStateOf("") }
@@ -246,7 +260,7 @@ fun AglTokenScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Contract address row
+                    // Contract address row & Quick Swap Action
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -257,12 +271,22 @@ fun AglTokenScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = BaseBlockchainConfig.AGL_TOKEN_CONTRACT.take(14) + "..." + BaseBlockchainConfig.AGL_TOKEN_CONTRACT.takeLast(8),
+                            text = BaseBlockchainConfig.AGL_TOKEN_CONTRACT.take(12) + "..." + BaseBlockchainConfig.AGL_TOKEN_CONTRACT.takeLast(6),
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             color = TextSecondary
                         )
-                        Row {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Button(
+                                onClick = { selectedTab = 0 },
+                                colors = ButtonDefaults.buttonColors(containerColor = BaseCyan),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.testTag("header_quick_swap_btn")
+                            ) {
+                                Text("⚡ DEX Swap", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = DarkBackground)
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
                             IconButton(
                                 onClick = {
                                     clipboardManager.setText(AnnotatedString(BaseBlockchainConfig.AGL_TOKEN_CONTRACT))
@@ -288,7 +312,7 @@ fun AglTokenScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Action Tabs: Transfer, Approve, Burn
+        // Action Tabs: Swap, Transfer, Approve, Burn, Allocation
         item {
             TabRow(
                 selectedTabIndex = selectedTab,
@@ -304,22 +328,27 @@ fun AglTokenScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Transfer", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                    text = { Text("Swap", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("Approve", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                    text = { Text("Transfer", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    text = { Text("Burn", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                    text = { Text("Approve", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3 },
-                    text = { Text("Allocation", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                    text = { Text("Burn", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                )
+                Tab(
+                    selected = selectedTab == 4,
+                    onClick = { selectedTab = 4 },
+                    text = { Text("Distribution", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -328,6 +357,17 @@ fun AglTokenScreen(
         // Tab content
         when (selectedTab) {
             0 -> {
+                // DEX Swap Tab
+                item {
+                    AglDexSwapTabContent(
+                        walletState = walletState,
+                        onStartTx = onStartTx,
+                        onShowSnackbar = onShowSnackbar
+                    )
+                }
+            }
+
+            1 -> {
                 // Transfer Form
                 item {
                     Card(
@@ -397,7 +437,7 @@ fun AglTokenScreen(
                 }
             }
 
-            1 -> {
+            2 -> {
                 // Approve Spender Form
                 item {
                     Card(
@@ -489,7 +529,7 @@ fun AglTokenScreen(
                 }
             }
 
-            2 -> {
+            3 -> {
                 // Burn Form
                 item {
                     Card(
@@ -555,7 +595,7 @@ fun AglTokenScreen(
                 }
             }
 
-            3 -> {
+            4 -> {
                 // Interactive Recharts-Style Token Balance Pie Chart
                 item {
                     TokenBalancePieChart(
@@ -573,6 +613,384 @@ fun AglTokenScreen(
 
         item {
             Spacer(modifier = Modifier.height(28.dp))
+        }
+    }
+}
+
+@Composable
+private fun AglDexSwapTabContent(
+    walletState: LiveWalletState?,
+    onStartTx: (TxPipelineRequest) -> Unit,
+    onShowSnackbar: (String) -> Unit
+) {
+    val dexService = remember { DexAggregatorService() }
+    val scope = rememberCoroutineScope()
+
+    var tokenIn by remember { mutableStateOf(DexAggregatorService.SUPPORTED_TOKENS[0]) } // ETH default
+    var tokenOut by remember { mutableStateOf(DexAggregatorService.SUPPORTED_TOKENS[1]) } // AGL default
+    var amountInText by remember { mutableStateOf("0.1") }
+    var slippagePercent by remember { mutableDoubleStateOf(0.5) }
+
+    var currentQuote by remember { mutableStateOf<DexQuote?>(null) }
+    var isLoadingQuote by remember { mutableStateOf(false) }
+
+    // Recalculate quote when tokens, amount, or slippage changes
+    LaunchedEffect(tokenIn, tokenOut, amountInText, slippagePercent) {
+        val amountVal = amountInText.toDoubleOrNull() ?: 0.0
+        if (amountVal > 0) {
+            isLoadingQuote = true
+            val res = dexService.getBestQuote(
+                tokenIn = tokenIn,
+                tokenOut = tokenOut,
+                amountIn = amountVal,
+                slippageTolerancePercent = slippagePercent,
+                userAddress = walletState?.address ?: BaseBlockchainConfig.DEFAULT_DEMO_WALLET
+            )
+            res.onSuccess { currentQuote = it }.onFailure { currentQuote = null }
+            isLoadingQuote = false
+        } else {
+            currentQuote = null
+        }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("agl_dex_swap_card"),
+        colors = CardDefaults.cardColors(containerColor = DarkCard),
+        shape = RoundedCornerShape(20.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, BaseCyan.copy(alpha = 0.4f))
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            // Header Title
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.SwapHoriz,
+                        contentDescription = "DEX Swap",
+                        tint = BaseCyan,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Decentralized DEX Swap",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(BaseBlue.copy(alpha = 0.2f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text("Aerodrome & UniV3", fontSize = 11.sp, color = BaseCyan, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Token IN Input Container
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = DarkBackground),
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, DarkBorder)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("You Pay", fontSize = 11.sp, color = TextMuted)
+                        Text(
+                            text = "Balance: ${if (tokenIn.symbol == "AGL") walletState?.formattedAglBalance ?: "0.0" else walletState?.formattedEthBalance ?: "0.0"} ${tokenIn.symbol}",
+                            fontSize = 11.sp,
+                            color = TextSecondary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Amount TextField
+                        OutlinedTextField(
+                            value = amountInText,
+                            onValueChange = { amountInText = it },
+                            placeholder = { Text("0.0", color = TextMuted) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("swap_amount_in_input"),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BaseCyan,
+                                unfocusedBorderColor = Color.Transparent
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Token selector button
+                        Surface(
+                            color = DarkCard,
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, DarkBorder),
+                            modifier = Modifier.clickable {
+                                // Cycle tokenIn
+                                val nextIdx = (DexAggregatorService.SUPPORTED_TOKENS.indexOf(tokenIn) + 1) % DexAggregatorService.SUPPORTED_TOKENS.size
+                                val newToken = DexAggregatorService.SUPPORTED_TOKENS[nextIdx]
+                                if (newToken == tokenOut) {
+                                    tokenOut = tokenIn
+                                }
+                                tokenIn = newToken
+                            }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(tokenIn.iconEmoji, fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(tokenIn.symbol, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+                            }
+                        }
+                    }
+
+                    // Quick percent buttons
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("25%", "50%", "75%", "MAX").forEach { pct ->
+                            OutlinedButton(
+                                onClick = {
+                                    val bal = if (tokenIn.symbol == "AGL") {
+                                        walletState?.formattedAglBalance?.toDoubleOrNull() ?: 100.0
+                                    } else {
+                                        walletState?.formattedEthBalance?.toDoubleOrNull() ?: 1.0
+                                    }
+                                    val factor = when(pct) {
+                                        "25%" -> 0.25
+                                        "50%" -> 0.50
+                                        "75%" -> 0.75
+                                        else -> 1.0
+                                    }
+                                    amountInText = "%.4f".format(bal * factor)
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 2.dp)
+                            ) {
+                                Text(pct, fontSize = 10.sp, color = BaseCyan)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Swap Switch Direction Button
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                IconButton(
+                    onClick = {
+                        val temp = tokenIn
+                        tokenIn = tokenOut
+                        tokenOut = temp
+                    },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(DarkCardElevated)
+                        .border(1.dp, BaseCyan, CircleShape)
+                        .testTag("swap_direction_toggle")
+                ) {
+                    Icon(Icons.Default.SwapVert, contentDescription = "Reverse Swap", tint = BaseCyan, modifier = Modifier.size(20.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Token OUT Container
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = DarkBackground),
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, DarkBorder)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text("You Receive (Estimated)", fontSize = 11.sp, color = TextMuted)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = if (isLoadingQuote) "Calculating..." else (currentQuote?.formattedAmountOut ?: "0.0"),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NeonEmerald
+                        )
+
+                        // Token selector button
+                        Surface(
+                            color = DarkCard,
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, DarkBorder),
+                            modifier = Modifier.clickable {
+                                // Cycle tokenOut
+                                val nextIdx = (DexAggregatorService.SUPPORTED_TOKENS.indexOf(tokenOut) + 1) % DexAggregatorService.SUPPORTED_TOKENS.size
+                                val newToken = DexAggregatorService.SUPPORTED_TOKENS[nextIdx]
+                                if (newToken == tokenIn) {
+                                    tokenIn = tokenOut
+                                }
+                                tokenOut = newToken
+                            }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(tokenOut.iconEmoji, fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(tokenOut.symbol, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Slippage Selector
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Tune, contentDescription = "Slippage", tint = TextMuted, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Slippage Tolerance", fontSize = 11.sp, color = TextMuted)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf(0.1, 0.5, 1.0, 3.0).forEach { slip ->
+                        val isSelected = slippagePercent == slip
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isSelected) BaseCyan.copy(alpha = 0.2f) else DarkBackground)
+                                .border(1.dp, if (isSelected) BaseCyan else DarkBorder, RoundedCornerShape(6.dp))
+                                .clickable { slippagePercent = slip }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "$slip%",
+                                fontSize = 10.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) BaseCyan else TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Live Quote Details Card
+            currentQuote?.let { quote ->
+                Spacer(modifier = Modifier.height(14.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = DarkBackground),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Exchange Rate", fontSize = 11.sp, color = TextMuted)
+                            Text(quote.formattedRate, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Min. Received ($slippagePercent%)", fontSize = 11.sp, color = TextMuted)
+                            Text(quote.formattedMinimumReceived, fontSize = 11.sp, color = TextPrimary)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Price Impact / Fee", fontSize = 11.sp, color = TextMuted)
+                            Text(
+                                text = "%.2f%% • ~$%.2f Gas".format(quote.priceImpactPercent, quote.estimatedGasUsd),
+                                fontSize = 11.sp,
+                                color = if (quote.priceImpactPercent > 2.0) NeonRose else NeonEmerald
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Best Router", fontSize = 11.sp, color = TextMuted)
+                            Text(quote.protocolName, fontSize = 11.sp, color = BaseCyan, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Execute Swap Button
+            Button(
+                onClick = {
+                    val quote = currentQuote
+                    if (quote == null) {
+                        onShowSnackbar("Please enter a valid swap amount")
+                        return@Button
+                    }
+                    val amountWei = EvmCoder.parseUnits(amountInText, tokenIn.decimals)
+                    val req = TxPipelineRequest(
+                        title = "DEX Swap ${tokenIn.symbol} → ${tokenOut.symbol}",
+                        description = "Executing decentralized swap via ${quote.protocolName} router on Base Mainnet",
+                        targetContract = quote.routerAddress,
+                        tokenRequired = tokenIn.symbol,
+                        amountWei = if (tokenIn.isNative) amountWei else BigInteger.ZERO,
+                        calldata = "0x"
+                    )
+                    onStartTx(req)
+                    onShowSnackbar("Submitted DEX Swap: ${tokenIn.symbol} -> ${tokenOut.symbol}")
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("execute_dex_swap_button"),
+                colors = ButtonDefaults.buttonColors(containerColor = BaseCyan),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                if (isLoadingQuote) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = DarkBackground, strokeWidth = 2.dp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Calculating Route...", color = DarkBackground, fontWeight = FontWeight.Bold)
+                } else {
+                    Icon(Icons.Default.SwapHoriz, contentDescription = "Swap", tint = DarkBackground, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Swap ${tokenIn.symbol} for ${tokenOut.symbol}",
+                        color = DarkBackground,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
+            }
         }
     }
 }

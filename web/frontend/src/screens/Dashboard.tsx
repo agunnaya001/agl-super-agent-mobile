@@ -4,6 +4,8 @@ import { Screen } from "../types";
 import { fmtUsd, fmtNum, timeAgo, statusPill, shortAddr } from "../ui";
 import { D3BalanceChart } from "../components/D3BalanceChart";
 import { TokenLogo } from "../components/TokenLogo";
+import { AgentVaults } from "../components/AgentVaults";
+import { ViralShareModal } from "../components/ViralShareModal";
 
 export function DashboardScreen({ wallet, navigate }: { wallet: string; navigate: (s: Screen) => void }) {
   const [status, setStatus] = useState<any>(null);
@@ -13,6 +15,7 @@ export function DashboardScreen({ wallet, navigate }: { wallet: string; navigate
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const load = async () => {
     const [s, o, e, t, p] = await Promise.all([
@@ -40,7 +43,12 @@ export function DashboardScreen({ wallet, navigate }: { wallet: string; navigate
     <div>
       <div className="row between" style={{ marginBottom: 14 }}>
         <div className="row gap"><span style={{ fontSize: 22 }}>📊</span><span style={{ fontSize: 20, fontWeight: 800 }}>Agent Dashboard</span></div>
+        <button className="btn purple" style={{ fontSize: 11, padding: "6px 12px" }} onClick={() => setShowShareModal(true)}>
+          🚀 Viral Share
+        </button>
       </div>
+
+      {showShareModal && <ViralShareModal wallet={wallet} onClose={() => setShowShareModal(false)} />}
 
       {/* Agent status */}
       <div className="card card-elev" style={{ borderColor: healthy ? "rgba(0,230,153,0.5)" : "var(--border)" }}>
@@ -70,6 +78,9 @@ export function DashboardScreen({ wallet, navigate }: { wallet: string; navigate
 
       {/* D3 Balance History Chart */}
       <D3BalanceChart wallet={wallet} />
+
+      {/* Aerodrome Yield Vaults & ERC-6551 Token Bound Agent Account */}
+      <AgentVaults wallet={wallet} />
 
       {/* Quick metrics */}
       <div className="metrics" style={{ marginTop: 14 }}>

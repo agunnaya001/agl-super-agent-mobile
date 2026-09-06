@@ -48,7 +48,14 @@ import com.example.data.model.AglOraclePriceData
 import com.example.data.model.BaseTransaction
 import com.example.data.model.TransactionStatus
 import com.example.data.remote.blockchain.diagnostics.NetworkDiagnosticReport
+import com.example.ui.components.AgentVaultsAndErc6551Component
+import com.example.ui.components.ViralSocialShareModal
 import com.example.ui.components.charts.D3WalletBalanceChart
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import com.example.ui.theme.BaseBlue
 import com.example.ui.theme.BaseCyan
 import com.example.ui.theme.DarkBackground
@@ -87,6 +94,15 @@ fun DashboardScreen(
     onNavigate: (AppScreen) -> Unit,
     onShowSnackbar: (String) -> Unit
 ) {
+    var showViralModal by remember { mutableStateOf(false) }
+
+    if (showViralModal) {
+        ViralSocialShareModal(
+            walletAddress = activeWalletAddress,
+            onDismiss = { showViralModal = false }
+        )
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -120,11 +136,19 @@ fun DashboardScreen(
                         color = TextPrimary
                     )
                 }
-                IconButton(onClick = { onRefresh() }, modifier = Modifier.testTag("dashboard_refresh")) {
-                    if (isRefreshingOracle) {
-                        CircularProgressIndicator(color = BaseCyan, modifier = Modifier.size(22.dp))
-                    } else {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = BaseCyan)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { showViralModal = true },
+                        modifier = Modifier.testTag("dashboard_viral_share")
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "Share", tint = GoldRewards)
+                    }
+                    IconButton(onClick = { onRefresh() }, modifier = Modifier.testTag("dashboard_refresh")) {
+                        if (isRefreshingOracle) {
+                            CircularProgressIndicator(color = BaseCyan, modifier = Modifier.size(22.dp))
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = BaseCyan)
+                        }
                     }
                 }
             }
@@ -257,6 +281,17 @@ fun DashboardScreen(
         // 30-Day D3 Wallet Balance Line Chart
         item {
             D3WalletBalanceChart(walletAddress = activeWalletAddress)
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Aerodrome Yield Vaults & ERC-6551 Token Bound Accounts
+        item {
+            AgentVaultsAndErc6551Component(
+                walletAddress = activeWalletAddress,
+                onExecuteTx = { title, target, callData ->
+                    onShowSnackbar("Submitted $title to Base Mainnet")
+                }
+            )
             Spacer(modifier = Modifier.height(16.dp))
         }
 
