@@ -101,6 +101,9 @@ import com.example.ui.theme.DarkCardElevated
 import com.example.ui.theme.NeonEmerald
 import com.example.ui.theme.NeonRose
 import com.example.ui.theme.RadiantPurple
+import com.example.ui.theme.RiskHighBg
+import com.example.ui.theme.RiskLowBg
+import com.example.ui.theme.RiskReviewBg
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary

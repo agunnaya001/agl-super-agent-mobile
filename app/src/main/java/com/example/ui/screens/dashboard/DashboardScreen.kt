@@ -48,6 +48,7 @@ import com.example.data.model.AglOraclePriceData
 import com.example.data.model.BaseTransaction
 import com.example.data.model.TransactionStatus
 import com.example.data.remote.blockchain.diagnostics.NetworkDiagnosticReport
+import com.example.ui.components.charts.D3WalletBalanceChart
 import com.example.ui.theme.BaseBlue
 import com.example.ui.theme.BaseCyan
 import com.example.ui.theme.DarkBackground
@@ -250,6 +251,12 @@ fun DashboardScreen(
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // 30-Day D3 Wallet Balance Line Chart
+        item {
+            D3WalletBalanceChart(walletAddress = activeWalletAddress)
             Spacer(modifier = Modifier.height(16.dp))
         }
 

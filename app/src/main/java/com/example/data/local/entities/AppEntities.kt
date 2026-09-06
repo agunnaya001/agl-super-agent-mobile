@@ -8,7 +8,12 @@ data class WalletAccountEntity(
     @PrimaryKey val address: String,
     val label: String,
     val isPrimary: Boolean = false,
-    val addedTimestamp: Long = System.currentTimeMillis()
+    val addedTimestamp: Long = System.currentTimeMillis(),
+    val walletType: String = "WATCH_ONLY",
+    val encryptedPrivateKey: String? = null,
+    val ivBase64: String? = null,
+    val isHardware: Boolean = false,
+    val avatarEmoji: String = "👛"
 )
 
 @Entity(tableName = "transactions")
@@ -38,7 +43,10 @@ data class ChatMessageEntity(
     val timestamp: Long = System.currentTimeMillis(),
     val relatedAddressOrTx: String? = null,
     val riskLevel: String? = null,
-    val suggestedActionsJson: String? = null
+    val suggestedActionsJson: String? = null,
+    val personaRole: String? = null,
+    val modelUsed: String? = null,
+    val sourcesJson: String? = null
 )
 
 @Entity(tableName = "quests")

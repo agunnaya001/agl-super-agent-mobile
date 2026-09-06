@@ -41,8 +41,9 @@ class TransactionAiSummarizer(
         """.trimIndent()
 
         val aiResult = geminiClient.askAssistant(systemPrompt, emptyList(), prompt)
-        if (aiResult.isSuccess && !aiResult.getOrNull().isNullOrBlank()) {
-            return@withContext aiResult.getOrThrow().trim()
+        val text = aiResult.getOrNull()?.text
+        if (aiResult.isSuccess && !text.isNullOrBlank()) {
+            return@withContext text.trim()
         }
 
         // Deterministic on-chain AI heuristic summary for each transaction type

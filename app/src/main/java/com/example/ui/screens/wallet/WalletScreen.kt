@@ -34,13 +34,20 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.HowToVote
 import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Token
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import com.example.util.BiometricCapabilityStatus
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -122,11 +129,22 @@ fun WalletScreen(
     isIndexingTransactions: Boolean = false,
     indexerStatus: String = "Live Basescan Indexer",
     onRefreshTransactions: () -> Unit = {},
+    isWalletUnlocked: Boolean = false,
+    isBiometricLockEnabled: Boolean = true,
+    biometricStatus: BiometricCapabilityStatus = BiometricCapabilityStatus.AVAILABLE,
+    onUnlockWithBiometrics: () -> Unit = {},
+    onLockWallet: () -> Unit = {},
+    onToggleBiometricLock: (Boolean) -> Unit = {},
+    onOpenSwapModal: () -> Unit = {},
+    onOpenTransferModal: () -> Unit = {},
+    onOpenReceiveModal: () -> Unit = {},
+    onOpenBuyModal: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
     var selectedWalletTab by remember { mutableStateOf(0) } // 0 = Assets, 1 = Real-Time AGL/wAGL, 2 = Activity, 3 = Brand Kit
     var selectedTxFilter by remember { mutableStateOf<TransactionType?>(null) }
+    val isSensitiveDataHidden = isBiometricLockEnabled && !isWalletUnlocked
 
     val filteredTransactions = remember(transactions, selectedTxFilter) {
         if (selectedTxFilter == null) {
@@ -156,15 +174,21 @@ fun WalletScreen(
     ) {
         item {
             Spacer(modifier = Modifier.height(4.dp))
-            // Wallet Switcher & Watch-Only Address Bar with Connect Button
+            // Wallet Switcher & Watch-Only Address Bar with Connect Button & Biometric Lock Pill
             WalletTopConnectionBar(
                 activeAddress = activeWalletAddress,
                 wallets = wallets,
                 isFetching = isFetchingLiveBalances,
+                isWalletUnlocked = isWalletUnlocked,
+                isBiometricLockEnabled = isBiometricLockEnabled,
+                biometricStatus = biometricStatus,
                 onSwitchWallet = onSwitchWallet,
                 onConnectWalletClick = onConnectWalletClick,
                 onDisconnectWallet = onDisconnectWallet,
                 onAddWalletClick = onAddWalletClick,
+                onUnlockWithBiometrics = onUnlockWithBiometrics,
+                onLockWallet = onLockWallet,
+                onToggleBiometricLock = onToggleBiometricLock,
                 onCopy = {
                     clipboardManager.setText(AnnotatedString(activeWalletAddress))
                     onShowSnackbar("Address copied to clipboard")
@@ -174,13 +198,23 @@ fun WalletScreen(
         }
 
         item {
-            // Prominent Real-time On-Chain AGL & wAGL Balance Showcase Card
+            // Prominent Real-time On-Chain AGL & wAGL Balance Showcase Card with Biometric Vault Protection
             RealTimeAglBalanceCard(
                 activeAddress = activeWalletAddress,
                 liveState = liveWalletState,
                 portfolioSummary = portfolioSummary,
                 isFetching = isFetchingLiveBalances,
+                isWalletUnlocked = isWalletUnlocked,
+                isBiometricLockEnabled = isBiometricLockEnabled,
+                biometricStatus = biometricStatus,
+                onUnlockWithBiometrics = onUnlockWithBiometrics,
+                onLockWallet = onLockWallet,
+                onToggleBiometricLock = onToggleBiometricLock,
                 onConnectWalletClick = onConnectWalletClick,
+                onOpenSwapModal = onOpenSwapModal,
+                onOpenTransferModal = onOpenTransferModal,
+                onOpenReceiveModal = onOpenReceiveModal,
+                onOpenBuyModal = onOpenBuyModal,
                 onRefresh = onRefresh,
                 onShowSnackbar = onShowSnackbar
             )
@@ -254,34 +288,116 @@ fun WalletScreen(
 
         when (selectedWalletTab) {
             0 -> {
-                // Interactive Recharts-Style Token Balance Pie Chart
+                // Interactive Recharts-Style Token Balance Pie Chart (hidden/obscured if locked)
                 item {
-                    TokenBalancePieChart(
-                        walletAddress = activeWalletAddress ?: BaseBlockchainConfig.DEFAULT_DEMO_WALLET,
-                        title = "Token Balance Breakdown",
-                        onSliceSelected = { slice ->
-                            if (slice != null) {
-                                onShowSnackbar("${slice.name}: ${slice.formattedBalance} (${slice.formattedValueUsd})")
+                    if (isSensitiveDataHidden) {
+                        GlassCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("wallet_pie_chart_locked"),
+                            cornerRadius = 16.dp,
+                            backgroundColor = DarkCard,
+                            borderColor = BaseCyan.copy(alpha = 0.3f)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(BaseBlue.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Fingerprint,
+                                        contentDescription = "Biometric Lock",
+                                        tint = BaseCyan,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "Portfolio Chart Secured",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Authenticate with biometric sensor to reveal token breakdown pie chart and individual asset allocations.",
+                                    fontSize = 12.sp,
+                                    color = TextSecondary,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(
+                                    onClick = onUnlockWithBiometrics,
+                                    colors = ButtonDefaults.buttonColors(containerColor = BaseBlue),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.testTag("btn_unlock_pie_chart")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.LockOpen,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Authenticate with Biometrics", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
-                    )
+                    } else {
+                        TokenBalancePieChart(
+                            walletAddress = activeWalletAddress.ifEmpty { BaseBlockchainConfig.DEFAULT_DEMO_WALLET },
+                            title = "Token Balance Breakdown",
+                            onSliceSelected = { slice ->
+                                if (slice != null) {
+                                    onShowSnackbar("${slice.name}: ${slice.formattedBalance} (${slice.formattedValueUsd})")
+                                }
+                            }
+                        )
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
                 // Tokens list
                 item {
-                    Text(
-                        text = "Base Ecosystem Tokens",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Base Ecosystem Tokens",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        if (isSensitiveDataHidden) {
+                            Text(
+                                text = "🔒 Balances Hidden",
+                                fontSize = 11.sp,
+                                color = AmberWarning,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
                 }
                 items(tokens) { token ->
                     TokenRow(
                         token = token,
+                        isMasked = isSensitiveDataHidden,
                         onClick = {
-                            onShowSnackbar("${token.name} (${token.symbol}) - Contract: ${token.contractAddress.take(8)}...")
+                            if (isSensitiveDataHidden) {
+                                onUnlockWithBiometrics()
+                            } else {
+                                onShowSnackbar("${token.name} (${token.symbol}) - Contract: ${token.contractAddress.take(8)}...")
+                            }
                         }
                     )
                 }
@@ -293,6 +409,8 @@ fun WalletScreen(
                     LiveOnChainDetailSection(
                         activeAddress = activeWalletAddress,
                         liveState = liveWalletState,
+                        isSensitiveDataHidden = isSensitiveDataHidden,
+                        onUnlockWithBiometrics = onUnlockWithBiometrics,
                         onCopyContract = { contract, label ->
                             clipboardManager.setText(AnnotatedString(contract))
                             onShowSnackbar("$label address copied")
@@ -344,10 +462,16 @@ fun WalletTopConnectionBar(
     activeAddress: String,
     wallets: List<WalletAccountEntity>,
     isFetching: Boolean,
+    isWalletUnlocked: Boolean = false,
+    isBiometricLockEnabled: Boolean = true,
+    biometricStatus: BiometricCapabilityStatus = BiometricCapabilityStatus.AVAILABLE,
     onSwitchWallet: (String) -> Unit,
     onConnectWalletClick: () -> Unit,
     onDisconnectWallet: () -> Unit,
     onAddWalletClick: () -> Unit,
+    onUnlockWithBiometrics: () -> Unit,
+    onLockWallet: () -> Unit,
+    onToggleBiometricLock: (Boolean) -> Unit,
     onCopy: () -> Unit,
     onRefresh: () -> Unit
 ) {
@@ -381,6 +505,52 @@ fun WalletTopConnectionBar(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Biometric Security Lock/Unlock Status Pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            if (!isBiometricLockEnabled) DarkBorder.copy(alpha = 0.5f)
+                            else if (isWalletUnlocked) NeonEmerald.copy(alpha = 0.18f)
+                            else AmberWarning.copy(alpha = 0.18f)
+                        )
+                        .clickable {
+                            if (isBiometricLockEnabled) {
+                                if (isWalletUnlocked) onLockWallet() else onUnlockWithBiometrics()
+                            } else {
+                                onToggleBiometricLock(true)
+                            }
+                        }
+                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                        .testTag("biometric_status_indicator")
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (!isBiometricLockEnabled) Icons.Default.Shield
+                            else if (isWalletUnlocked) Icons.Default.LockOpen
+                            else Icons.Default.Lock,
+                            contentDescription = "Biometric Lock Status",
+                            tint = if (!isBiometricLockEnabled) TextSecondary
+                            else if (isWalletUnlocked) NeonEmerald
+                            else AmberWarning,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (!isBiometricLockEnabled) "Off"
+                            else if (isWalletUnlocked) "Unlocked"
+                            else "Locked",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (!isBiometricLockEnabled) TextSecondary
+                            else if (isWalletUnlocked) NeonEmerald
+                            else AmberWarning
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
                 IconButton(
                     onClick = onRefresh,
                     modifier = Modifier.size(28.dp)
@@ -500,14 +670,30 @@ fun RealTimeAglBalanceCard(
     liveState: LiveWalletState?,
     portfolioSummary: PortfolioSummary?,
     isFetching: Boolean,
+    isWalletUnlocked: Boolean = false,
+    isBiometricLockEnabled: Boolean = true,
+    biometricStatus: BiometricCapabilityStatus = BiometricCapabilityStatus.AVAILABLE,
+    onUnlockWithBiometrics: () -> Unit = {},
+    onLockWallet: () -> Unit = {},
+    onToggleBiometricLock: (Boolean) -> Unit = {},
     onConnectWalletClick: () -> Unit,
+    onOpenSwapModal: () -> Unit = {},
+    onOpenTransferModal: () -> Unit = {},
+    onOpenReceiveModal: () -> Unit = {},
+    onOpenBuyModal: () -> Unit = {},
     onRefresh: () -> Unit,
     onShowSnackbar: (String) -> Unit
 ) {
-    val aglBalance = liveState?.formattedAglBalance ?: "%.2f".format(portfolioSummary?.aglBalance ?: 1250.45)
-    val waglBalance = liveState?.formattedWAglBalance ?: "%.2f".format(portfolioSummary?.aglStaked ?: 250.0)
-    val creditsBalance = liveState?.formattedCredits ?: "${portfolioSummary?.aglCredits ?: 1420}"
-    val ethBalance = liveState?.formattedEthBalance ?: "0.084"
+    val isLocked = isBiometricLockEnabled && !isWalletUnlocked
+    val rawAglBalance = liveState?.formattedAglBalance ?: "%.2f".format(portfolioSummary?.aglBalance ?: 1250.45)
+    val rawWaglBalance = liveState?.formattedWAglBalance ?: "%.2f".format(portfolioSummary?.aglStaked ?: 250.0)
+    val rawCreditsBalance = liveState?.formattedCredits ?: "${portfolioSummary?.aglCredits ?: 1420}"
+    val rawEthBalance = liveState?.formattedEthBalance ?: "0.084"
+
+    val aglBalance = if (isLocked) "••••••" else rawAglBalance
+    val waglBalance = if (isLocked) "••••" else rawWaglBalance
+    val creditsBalance = if (isLocked) "••••" else rawCreditsBalance
+    val ethBalance = if (isLocked) "••••" else rawEthBalance
 
     GlassCard(
         modifier = Modifier
@@ -515,7 +701,7 @@ fun RealTimeAglBalanceCard(
             .testTag("wallet_balance_summary_card"),
         cornerRadius = 18.dp,
         backgroundColor = DarkCardElevated,
-        borderColor = BaseCyan.copy(alpha = 0.45f)
+        borderColor = if (isLocked) AmberWarning.copy(alpha = 0.5f) else BaseCyan.copy(alpha = 0.45f)
     ) {
         Column {
             Row(
@@ -528,156 +714,306 @@ fun RealTimeAglBalanceCard(
                         modifier = Modifier
                             .size(10.dp)
                             .clip(CircleShape)
-                            .background(if (isFetching) AmberWarning else NeonEmerald)
+                            .background(
+                                if (isFetching) AmberWarning
+                                else if (isLocked) AmberWarning
+                                else NeonEmerald
+                            )
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (isFetching) "Syncing Base RPC..." else "Base Live Balances",
+                        text = if (isFetching) "Syncing Base RPC..."
+                        else if (isLocked) "Biometric Shield Active"
+                        else "Base Live Balances",
                         fontSize = 12.sp,
-                        color = if (isFetching) AmberWarning else BaseCyan,
+                        color = if (isFetching || isLocked) AmberWarning else BaseCyan,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(BaseBlue.copy(alpha = 0.25f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = "RPC: Base Mainnet",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = BaseCyan
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isBiometricLockEnabled) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isLocked) AmberWarning.copy(alpha = 0.2f) else NeonEmerald.copy(alpha = 0.2f))
+                                .clickable {
+                                    if (isLocked) onUnlockWithBiometrics() else onLockWallet()
+                                }
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                .testTag("btn_lock_toggle")
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                    contentDescription = null,
+                                    tint = if (isLocked) AmberWarning else NeonEmerald,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isLocked) "Locked" else "Lock",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isLocked) AmberWarning else NeonEmerald
+                                )
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(BaseBlue.copy(alpha = 0.25f))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "RPC: Base Mainnet",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = BaseCyan
+                            )
+                        }
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Primary AGL Balance
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Column {
+            if (isLocked) {
+                // Biometric locked card representation
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(DarkBackground.copy(alpha = 0.8f))
+                        .padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(AmberWarning.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Fingerprint,
+                            contentDescription = "Fingerprint Sensor",
+                            tint = AmberWarning,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Text(
-                        text = "AGL Token Balance",
-                        fontSize = 12.sp,
-                        color = TextSecondary,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "$aglBalance AGL",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        color = GoldRewards
-                    )
-                }
-
-                val aglValUsd = (aglBalance.toDoubleOrNull() ?: 0.0) * 3.42
-                Text(
-                    text = "≈ $%,.2f USD".format(aglValUsd),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextPrimary
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // 3-Pill Real-time Metrics Grid
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(DarkBackground.copy(alpha = 0.75f))
-                    .padding(10.dp),
-                horizontalArrangement = Arrangement.SpaceAround
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "Wrapped wAGL", fontSize = 10.sp, color = TextMuted)
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "$waglBalance wAGL",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = BaseCyan
-                    )
-                    Text(text = "Voting Power", fontSize = 9.sp, color = NeonEmerald)
-                }
-
-                Box(modifier = Modifier.width(1.dp).height(32.dp).background(DarkBorder))
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "AI Credits", fontSize = 10.sp, color = TextMuted)
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "$creditsBalance CR",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GoldRewards
-                    )
-                    Text(text = "Compute Balance", fontSize = 9.sp, color = TextSecondary)
-                }
-
-                Box(modifier = Modifier.width(1.dp).height(32.dp).background(DarkBorder))
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "Base Gas", fontSize = 10.sp, color = TextMuted)
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "$ethBalance ETH",
-                        fontSize = 13.sp,
+                        text = "Sensitive Balance Protected",
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
-                    Text(text = "Layer 2 Gas", fontSize = 9.sp, color = BaseCyan)
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Android BiometricPrompt security layer is active. Authenticate with fingerprint or device lock to decrypt live on-chain balances.",
+                        fontSize = 11.sp,
+                        color = TextSecondary,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        lineHeight = 15.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = onUnlockWithBiometrics,
+                        colors = ButtonDefaults.buttonColors(containerColor = BaseCyan),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp)
+                            .testTag("btn_authenticate_biometric")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Fingerprint,
+                            contentDescription = null,
+                            tint = DarkBackground,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Authenticate to View Balance",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = DarkBackground
+                        )
+                    }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Quick Actions Bar
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = {
-                        onShowSnackbar("EIP-681 Transfer URI generated for $aglBalance AGL")
-                    },
-                    modifier = Modifier.weight(1f).height(36.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = DarkCard),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+            } else {
+                // Primary AGL Balance when Unlocked
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    Text("Send AGL", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                    Column {
+                        Text(
+                            text = "AGL Token Balance",
+                            fontSize = 12.sp,
+                            color = TextSecondary,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "$aglBalance AGL",
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Black,
+                            color = GoldRewards
+                        )
+                    }
+
+                    val aglValUsd = (aglBalance.toDoubleOrNull() ?: 0.0) * 3.42
+                    Text(
+                        text = "≈ $%,.2f USD".format(aglValUsd),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
+                    )
                 }
 
-                Button(
-                    onClick = {
-                        onShowSnackbar("wAGL Staking / Governance deposit selected")
-                    },
-                    modifier = Modifier.weight(1f).height(36.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BaseBlue),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 3-Pill Real-time Metrics Grid
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(DarkBackground.copy(alpha = 0.75f))
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.SpaceAround
                 ) {
-                    Text("Wrap wAGL", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = "Wrapped wAGL", fontSize = 10.sp, color = TextMuted)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "$waglBalance wAGL",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = BaseCyan
+                        )
+                        Text(text = "Voting Power", fontSize = 9.sp, color = NeonEmerald)
+                    }
+
+                    Box(modifier = Modifier.width(1.dp).height(32.dp).background(DarkBorder))
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = "AI Credits", fontSize = 10.sp, color = TextMuted)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "$creditsBalance CR",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GoldRewards
+                        )
+                        Text(text = "Compute Balance", fontSize = 9.sp, color = TextSecondary)
+                    }
+
+                    Box(modifier = Modifier.width(1.dp).height(32.dp).background(DarkBorder))
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = "Base Gas", fontSize = 10.sp, color = TextMuted)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "$ethBalance ETH",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Text(text = "Layer 2 Gas", fontSize = 9.sp, color = BaseCyan)
+                    }
                 }
 
-                Button(
-                    onClick = onRefresh,
-                    modifier = Modifier.weight(1f).height(36.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = DarkCard),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Interactive 4-Action Web3 Bar: Swap, Send, Receive, Buy
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text("Live RPC Sync", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = BaseCyan)
+                    // 1. Swap (DEX Aggregator)
+                    Button(
+                        onClick = onOpenSwapModal,
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .height(38.dp)
+                            .testTag("btn_action_swap"),
+                        colors = ButtonDefaults.buttonColors(containerColor = BaseBlue),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("🔄", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Swap", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+
+                    // 2. Send (Transfer)
+                    Button(
+                        onClick = onOpenTransferModal,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .testTag("btn_action_send"),
+                        colors = ButtonDefaults.buttonColors(containerColor = DarkCard),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, DarkBorder),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.ArrowUpward, contentDescription = null, tint = BaseCyan, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("Send", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                        }
+                    }
+
+                    // 3. Receive
+                    Button(
+                        onClick = onOpenReceiveModal,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .testTag("btn_action_receive"),
+                        colors = ButtonDefaults.buttonColors(containerColor = DarkCard),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, DarkBorder),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("Receive", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                        }
+                    }
+
+                    // 4. Buy
+                    Button(
+                        onClick = onOpenBuyModal,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .testTag("btn_action_buy"),
+                        colors = ButtonDefaults.buttonColors(containerColor = DarkCard),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, DarkBorder),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("💳", fontSize = 11.sp)
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("Buy", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = GoldRewards)
+                        }
+                    }
                 }
             }
         }
@@ -688,20 +1024,43 @@ fun RealTimeAglBalanceCard(
 fun LiveOnChainDetailSection(
     activeAddress: String,
     liveState: LiveWalletState?,
+    isSensitiveDataHidden: Boolean = false,
+    onUnlockWithBiometrics: () -> Unit = {},
     onCopyContract: (String, String) -> Unit,
     onShowSnackbar: (String) -> Unit
 ) {
+    val aglBalance = if (isSensitiveDataHidden) "••••••" else (liveState?.formattedAglBalance ?: "1,250.45")
+    val waglBalance = if (isSensitiveDataHidden) "••••" else (liveState?.formattedWAglBalance ?: "250.00")
+    val creditsBalance = if (isSensitiveDataHidden) "••••" else (liveState?.formattedCredits ?: "1,420")
+
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = "On-Chain Service Layer Inspection",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = TextPrimary
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "On-Chain Service Layer Inspection",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
+            )
+            if (isSensitiveDataHidden) {
+                Text(
+                    text = "🔒 Biometric Shield Active",
+                    fontSize = 11.sp,
+                    color = AmberWarning,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable { onUnlockWithBiometrics() }
+                )
+            }
+        }
 
         // AGL Token Contract Card
         GlassCard(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { if (isSensitiveDataHidden) onUnlockWithBiometrics() },
             cornerRadius = 14.dp,
             backgroundColor = DarkCard,
             borderColor = GoldRewards.copy(alpha = 0.3f)
@@ -721,7 +1080,7 @@ fun LiveOnChainDetailSection(
                         }
                     }
                     Text(
-                        text = "${liveState?.formattedAglBalance ?: "1,250.45"} AGL",
+                        text = "$aglBalance AGL",
                         fontWeight = FontWeight.Black,
                         color = GoldRewards,
                         fontSize = 15.sp
@@ -751,7 +1110,9 @@ fun LiveOnChainDetailSection(
 
         // wAGL Votes Wrapper Card
         GlassCard(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { if (isSensitiveDataHidden) onUnlockWithBiometrics() },
             cornerRadius = 14.dp,
             backgroundColor = DarkCard,
             borderColor = BaseCyan.copy(alpha = 0.3f)
@@ -771,7 +1132,7 @@ fun LiveOnChainDetailSection(
                         }
                     }
                     Text(
-                        text = "${liveState?.formattedWAglBalance ?: "250.00"} wAGL",
+                        text = "$waglBalance wAGL",
                         fontWeight = FontWeight.Black,
                         color = BaseCyan,
                         fontSize = 15.sp
@@ -801,7 +1162,9 @@ fun LiveOnChainDetailSection(
 
         // AGL AI Credits Card
         GlassCard(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { if (isSensitiveDataHidden) onUnlockWithBiometrics() },
             cornerRadius = 14.dp,
             backgroundColor = DarkCard,
             borderColor = NeonEmerald.copy(alpha = 0.3f)
@@ -821,7 +1184,7 @@ fun LiveOnChainDetailSection(
                         }
                     }
                     Text(
-                        text = "${liveState?.formattedCredits ?: "1,420"} CR",
+                        text = "$creditsBalance CR",
                         fontWeight = FontWeight.Black,
                         color = NeonEmerald,
                         fontSize = 15.sp

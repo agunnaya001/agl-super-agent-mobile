@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { Screen } from "../types";
 import { fmtUsd, fmtNum, timeAgo, statusPill, shortAddr } from "../ui";
+import { D3BalanceChart } from "../components/D3BalanceChart";
+import { TokenLogo } from "../components/TokenLogo";
 
 export function DashboardScreen({ wallet, navigate }: { wallet: string; navigate: (s: Screen) => void }) {
   const [status, setStatus] = useState<any>(null);
@@ -66,8 +68,11 @@ export function DashboardScreen({ wallet, navigate }: { wallet: string; navigate
         </button>
       </div>
 
+      {/* D3 Balance History Chart */}
+      <D3BalanceChart wallet={wallet} />
+
       {/* Quick metrics */}
-      <div className="metrics" style={{ marginTop: 12 }}>
+      <div className="metrics" style={{ marginTop: 14 }}>
         <MetricCard icon="📈" tint="var(--neon)" label="AGL Price" value={fmtUsd(oracle?.currentPriceUsd ?? 3.42)} sub={`${(oracle?.change24hPercent ?? 0) >= 0 ? "+" : ""}${(oracle?.change24hPercent ?? 0).toFixed(1)}% 24h`} subColor={oracle?.change24hPercent >= 0 ? "var(--neon)" : "var(--rose)"} />
         <MetricCard icon="🤖" tint="var(--purple)" label="Active Agents" value={fmtNum(stats?.totalActiveAgents ?? 0)} sub="online globally" subColor="var(--text-2)" />
       </div>
@@ -84,7 +89,7 @@ export function DashboardScreen({ wallet, navigate }: { wallet: string; navigate
       </div>
       {txs.slice(0, 5).map((tx) => (
         <div key={tx.hash} className="list-row">
-          <div className="avatar-circle" style={{ background: "rgba(0,230,153,0.12)" }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: tx.status === "SUCCESS" ? "var(--neon)" : tx.status === "PENDING" ? "var(--gold)" : "var(--rose)", display: "inline-block" }} /></div>
+          <TokenLogo symbol={tx.tokenSymbol || "AGL"} size={28} />
           <div className="col" style={{ flex: 1 }}>
             <div className="bold small">{tx.type.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c: string) => c.toUpperCase())}</div>
             <div className="tiny muted">{tx.value} {tx.tokenSymbol} · {timeAgo(tx.timestamp)}</div>

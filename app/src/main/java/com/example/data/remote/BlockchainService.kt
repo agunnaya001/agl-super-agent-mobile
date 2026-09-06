@@ -35,7 +35,7 @@ import java.util.Locale
 object BlockchainService {
 
     // Default watch address for inspection on Base
-    const val DEFAULT_DEMO_WALLET = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+    const val DEFAULT_DEMO_WALLET = "0xD034E94465Db1669f80D817c66e58cF194d027C8"
 
     // Contract registry constants
     const val AGL_TOKEN_CONTRACT = BaseBlockchainConfig.AGL_TOKEN_CONTRACT
@@ -57,6 +57,7 @@ object BlockchainService {
     val verifier = com.example.data.remote.blockchain.diagnostics.ContractRelationshipVerifier(rpcService)
     val txEngine = com.example.data.remote.blockchain.tx.TransactionPipelineEngine(rpcService)
     val walletService = WalletService(rpcService, aglTokenService, wagLService, aglCreditsService)
+    val dexAggregatorService = com.example.data.remote.blockchain.services.DexAggregatorService(rpcService, aglPriceOracleService)
     val transactionIndexerService = BaseTransactionIndexerService()
     val transactionAiSummarizer = TransactionAiSummarizer()
 

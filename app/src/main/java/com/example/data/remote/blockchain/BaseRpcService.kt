@@ -237,8 +237,65 @@ class BaseRpcService(
     }
 
     // =========================================================================
-    // Transactions & Logs
+    // Transactions, Nonce & Broadcast
     // =========================================================================
+
+    /**
+     * Retrieves the next transaction nonce for an account on Base Mainnet.
+     */
+    suspend fun getTransactionCount(address: String, block: String = "pending"): Result<BigInteger> {
+        val blockParam = parseBlockParameter(block)
+        return executeWeb3jWithRetry("getTransactionCount") { client ->
+            val response = client.ethGetTransactionCount(address, blockParam).send()
+            if (response.hasError()) {
+                throw IllegalStateException("RPC Error ${response.error.code}: ${response.error.message}")
+            }
+            response.transactionCount ?: BigInteger.ZERO
+        }
+    }
+
+    /**
+     * Broadcasts a raw signed transaction to Base Mainnet.
+     */
+    suspend fun ethSendRawTransaction(signedTransactionHex: String): Result<String> {
+        val clean = EvmCoder.ensureHexPrefix(signedTransactionHex)
+        return executeWeb3jWithRetry("ethSendRawTransaction") { client ->
+            val response = client.ethSendRawTransaction(clean).send()
+            if (response.hasError()) {
+                throw IllegalStateException("Broadcast Error ${response.error.code}: ${response.error.message}")
+            }
+            response.transactionHash ?: throw IllegalStateException("No transaction hash returned from Base RPC")
+        }
+    }
+
+    /**
+     * Estimates gas needed for a transaction execution on Base Mainnet.
+     */
+    suspend fun ethEstimateGas(
+        from: String? = null,
+        to: String,
+        data: String? = null,
+        value: BigInteger = BigInteger.ZERO
+    ): Result<BigInteger> {
+        return executeWeb3jWithRetry("ethEstimateGas") { client ->
+            val tx = Transaction.createFunctionCallTransaction(
+                from,
+                null,
+                null,
+                null,
+                to,
+                value,
+                data
+            )
+            val response = client.ethEstimateGas(tx).send()
+            if (response.hasError()) {
+                // Fallback default for Base L2
+                BigInteger.valueOf(120000L)
+            } else {
+                response.amountUsed ?: BigInteger.valueOf(120000L)
+            }
+        }
+    }
 
     /**
      * Fetches transaction details by transaction hash using Web3j.

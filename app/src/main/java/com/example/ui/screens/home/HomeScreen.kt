@@ -36,6 +36,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -65,6 +66,7 @@ import com.example.ui.theme.BaseBlue
 import com.example.ui.theme.BaseCyan
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.DarkBorder
+import com.example.ui.theme.DarkBorderSubtle
 import com.example.ui.theme.DarkCard
 import com.example.ui.theme.DarkCardElevated
 import com.example.ui.theme.GoldRewards

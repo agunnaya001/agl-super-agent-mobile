@@ -42,9 +42,11 @@ googleServices = "4.5.0"
 credentials = "1.5.0"
 googleid = "1.1.1"
 web3j = "4.9.8"
+biometric = "1.2.0-alpha05"
 
 
 [libraries]
+androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

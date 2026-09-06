@@ -126,7 +126,7 @@ class AglPriceOracleService(
         val jitter = (Random.nextDouble(-0.015, 0.015))
         val dynamicPrice = (cachedPriceData.currentPriceUsd + jitter).coerceAtLeast(0.5)
         val roundOffset = Random.nextInt(1, 15)
-        val currentRound = (cachedPriceData.roundId.toLongOrNull() ?: 18446744073709553210L) + roundOffset
+        val currentRound = (cachedPriceData.roundId.toLongOrNull() ?: 50742110L) + roundOffset
 
         val fallbackData = cachedPriceData.copy(
             currentPriceUsd = "%.3f".format(dynamicPrice).toDouble(),

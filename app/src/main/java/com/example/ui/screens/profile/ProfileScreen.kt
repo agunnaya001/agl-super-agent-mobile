@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.entities.WalletAccountEntity
+import com.example.data.remote.BlockchainService
 import com.example.data.model.AchievementBadge
 import com.example.data.model.SuperAgentTier
 import com.example.data.model.UserProfile
@@ -83,7 +84,7 @@ fun ProfileScreen(
 ) {
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
     val profile = userProfile ?: UserProfile(
-        walletAddress = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+        walletAddress = BlockchainService.DEFAULT_DEMO_WALLET,
         totalXp = 12450,
         level = 24,
         tier = SuperAgentTier.GOLD,

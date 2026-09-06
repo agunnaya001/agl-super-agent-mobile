@@ -237,7 +237,8 @@ fun Web3PortfolioChart(
 fun TokenRow(
     token: TokenAsset,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isMasked: Boolean = false
 ) {
     Row(
         modifier = modifier
@@ -297,14 +298,14 @@ fun TokenRow(
 
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = "$%.2f".format(token.totalValueUsd),
+                text = if (isMasked) "$••••" else "$%.2f".format(token.totalValueUsd),
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
                 color = TextPrimary
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "%.4f %s".format(token.balance, token.symbol),
+                    text = if (isMasked) "•••••• ${token.symbol}" else "%.4f %s".format(token.balance, token.symbol),
                     fontSize = 12.sp,
                     color = TextSecondary
                 )

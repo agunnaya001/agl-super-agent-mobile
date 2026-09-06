@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { Screen } from "../types";
 import { fmtUsd, timeAgo, statusPill, shortAddr } from "../ui";
+import { TokenLogo } from "../components/TokenLogo";
 
 export function WalletScreen({ wallet, setWallet, navigate }: { wallet: string; setWallet: (a: string) => void; navigate: (s: Screen) => void }) {
   const [state, setState] = useState<any>(null);
@@ -10,6 +11,7 @@ export function WalletScreen({ wallet, setWallet, navigate }: { wallet: string; 
   const [txs, setTxs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [addrInput, setAddrInput] = useState("");
+  const [selectedTokenIndex, setSelectedTokenIndex] = useState<number | null>(null);
 
   const load = async (w: string) => {
     setLoading(true);
@@ -26,6 +28,26 @@ export function WalletScreen({ wallet, setWallet, navigate }: { wallet: string; 
     if (/^0x[a-fA-F0-9]{40}$/.test(addrInput.trim())) { setWallet(addrInput.trim()); setAddrInput(""); }
   };
 
+  // Pie chart calculation
+  const colors = ["#0052FF", "#00F0FF", "#A855F7", "#F59E0B", "#10B981", "#EC4899"];
+  const totalUsd = tokens.reduce((acc, t) => acc + (t.balance * t.priceUsd), 0) || 1;
+  let accumulatedAngle = 0;
+  const pieSlices = tokens.map((t, i) => {
+    const val = t.balance * t.priceUsd;
+    const fraction = val / totalUsd;
+    const angle = fraction * 360;
+    const startAngle = accumulatedAngle;
+    accumulatedAngle += angle;
+    return {
+      ...t,
+      val,
+      fraction,
+      startAngle,
+      angle,
+      color: colors[i % colors.length]
+    };
+  });
+
   return (
     <div>
       <div className="card card-elev">
@@ -40,19 +62,106 @@ export function WalletScreen({ wallet, setWallet, navigate }: { wallet: string; 
           <input className="input" placeholder="0x… address" value={addrInput} onChange={(e) => setAddrInput(e.target.value)} />
           <button className="btn" style={{ width: "auto", padding: "12px 16px" }} onClick={connect}>Connect</button>
         </div>
-        <div className="tiny muted" style={{ marginTop: 8 }}>Zero private keys · read-only monitoring</div>
+        <div className="tiny muted" style={{ marginTop: 8 }}>Zero private keys · read-only monitoring · Base Mainnet</div>
       </div>
 
-      {loading ? <div className="center"><div className="loader" /></div> : (
+      {loading ? <div className="center" style={{ padding: 40 }}><div className="loader" /></div> : (
         <>
-          <div className="section-title">Balances</div>
+          <div className="section-title">Portfolio Valuation</div>
           <div className="card">
-            <div style={{ fontSize: 26, fontWeight: 800 }}>{fmtUsd(portfolio?.totalBalanceUsd ?? 0)}</div>
+            <div style={{ fontSize: 28, fontWeight: 800 }}>{fmtUsd(portfolio?.totalBalanceUsd ?? 0)}</div>
             <div className="small muted">Total Value · {portfolio?.change24hPercent >= 0 ? "+" : ""}{(portfolio?.change24hPercent ?? 0).toFixed(1)}% 24h</div>
           </div>
-          {tokens.map((t) => (
-            <div key={t.symbol} className="list-row">
-              <div className="avatar-circle" style={{ background: "var(--surface)" }}>{t.iconEmoji}</div>
+
+          {tokens.length > 0 && (
+            <>
+              <div className="section-title">Token Allocation (Recharts Donut)</div>
+              <div className="card" style={{ textAlign: "center", padding: "18px 14px" }}>
+                <div style={{ position: "relative", width: 200, height: 200, margin: "0 auto" }}>
+                  <svg width="200" height="200" viewBox="0 0 100 100" style={{ transform: "rotate(-90deg)", borderRadius: "50%" }}>
+                    {pieSlices.map((slice, i) => {
+                      const strokeDasharray = `${(slice.fraction * 251.2).toFixed(2)} 251.2`;
+                      const strokeDashoffset = `-${(slice.startAngle / 360 * 251.2).toFixed(2)}`;
+                      const isSelected = selectedTokenIndex === i;
+                      return (
+                        <circle
+                          key={slice.symbol}
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          fill="transparent"
+                          stroke={slice.color}
+                          strokeWidth={isSelected ? "18" : "14"}
+                          strokeDasharray={strokeDasharray}
+                          strokeDashoffset={strokeDashoffset}
+                          style={{
+                            cursor: "pointer",
+                            transition: "stroke-width 0.2s ease, opacity 0.2s ease",
+                            opacity: selectedTokenIndex !== null && !isSelected ? 0.4 : 1
+                          }}
+                          onClick={() => setSelectedTokenIndex(isSelected ? null : i)}
+                        />
+                      );
+                    })}
+                  </svg>
+                  <div style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    pointerEvents: "none"
+                  }}>
+                    {selectedTokenIndex !== null ? (
+                      <>
+                        <div className="bold" style={{ fontSize: 13, color: pieSlices[selectedTokenIndex]?.color }}>{pieSlices[selectedTokenIndex]?.symbol}</div>
+                        <div style={{ fontSize: 16, fontWeight: 800 }}>{(pieSlices[selectedTokenIndex]?.fraction * 100).toFixed(1)}%</div>
+                        <div className="tiny muted">{fmtUsd(pieSlices[selectedTokenIndex]?.val)}</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="tiny muted">Total Value</div>
+                        <div style={{ fontSize: 15, fontWeight: 800 }}>{fmtUsd(portfolio?.totalBalanceUsd ?? 0)}</div>
+                        <div className="tiny" style={{ color: "var(--cyan)" }}>Base Assets</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ height: 16 }} />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
+                  {pieSlices.map((slice, i) => (
+                    <button
+                      key={slice.symbol}
+                      className="pill"
+                      style={{
+                        background: selectedTokenIndex === i ? slice.color + "33" : "var(--surface)",
+                        borderColor: selectedTokenIndex === i ? slice.color : "var(--border)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6
+                      }}
+                      onClick={() => setSelectedTokenIndex(selectedTokenIndex === i ? null : i)}
+                    >
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: slice.color, display: "inline-block" }} />
+                      <span className="bold">{slice.symbol}</span>
+                      <span className="tiny muted">{(slice.fraction * 100).toFixed(0)}%</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="section-title">Token Balances</div>
+          {tokens.map((t, idx) => (
+            <div key={t.symbol} className="list-row" onClick={() => setSelectedTokenIndex(selectedTokenIndex === idx ? null : idx)} style={{ cursor: "pointer" }}>
+              <TokenLogo symbol={t.symbol} size={32} />
               <div className="col" style={{ flex: 1 }}>
                 <div className="bold">{t.symbol}</div>
                 <div className="tiny muted">{t.name}</div>

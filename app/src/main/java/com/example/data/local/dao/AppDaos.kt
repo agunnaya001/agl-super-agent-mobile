@@ -21,6 +21,9 @@ interface WalletDao {
     @Query("SELECT * FROM wallet_accounts ORDER BY isPrimary DESC, addedTimestamp ASC")
     fun getAllWallets(): Flow<List<WalletAccountEntity>>
 
+    @Query("SELECT * FROM wallet_accounts WHERE address = :address LIMIT 1")
+    suspend fun getWalletByAddress(address: String): WalletAccountEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWallet(wallet: WalletAccountEntity)
 

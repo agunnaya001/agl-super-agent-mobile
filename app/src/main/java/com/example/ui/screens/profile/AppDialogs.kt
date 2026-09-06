@@ -50,6 +50,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -114,13 +117,35 @@ fun AddWalletDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                Text(
-                    text = "Track any Base wallet address safely. No private key or seed phrase required.",
-                    fontSize = 12.sp,
-                    color = TextSecondary
-                )
+                val clipboardManager = LocalClipboardManager.current
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Track any Base wallet address safely:",
+                        fontSize = 12.sp,
+                        color = TextSecondary
+                    )
+                    Text(
+                        text = "0xD034...27C8",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = BaseCyan,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(BaseBlue.copy(alpha = 0.2f))
+                            .clickable {
+                                addressInput = "0xD034E94465Db1669f80D817c66e58cF194d027C8"
+                                if (labelInput.isBlank()) labelInput = "Primary Base Wallet"
+                            }
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
 
                 OutlinedTextField(
                     value = addressInput,
@@ -129,6 +154,24 @@ fun AddWalletDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("new_wallet_address_input"),
+                    trailingIcon = {
+                        Button(
+                            onClick = {
+                                val text = clipboardManager.getText()?.text
+                                if (!text.isNullOrBlank()) {
+                                    addressInput = text.trim()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = BaseBlue.copy(alpha = 0.35f)),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.padding(end = 4.dp)
+                        ) {
+                            Icon(Icons.Default.ContentPaste, contentDescription = "Paste", tint = BaseCyan, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("PASTE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = BaseCyan)
+                        }
+                    },
                     shape = RoundedCornerShape(10.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = BaseCyan,

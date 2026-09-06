@@ -1,7 +1,6 @@
 package com.example
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -17,6 +16,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.local.AppDatabase
 import com.example.data.repository.AppRepository
@@ -44,18 +44,30 @@ import com.example.ui.screens.wagl.WagLScreen
 import com.example.ui.screens.wallet.ConnectWalletDialog
 import com.example.ui.screens.wallet.TransactionDetailSheet
 import com.example.ui.screens.wallet.WalletScreen
+import com.example.ui.screens.wallet.components.BuyCryptoModal
+import com.example.ui.screens.wallet.components.ConnectWalletModal
+import com.example.ui.screens.wallet.components.DexSwapModal
+import com.example.ui.screens.wallet.components.ReceiveModal
+import com.example.ui.screens.wallet.components.TransferModal
+import com.example.data.remote.BlockchainService
+import androidx.compose.ui.platform.LocalContext
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.AiSubTab
 import com.example.ui.viewmodel.AppScreen
 import com.example.ui.viewmodel.MainViewModel
 import com.example.ui.viewmodel.MainViewModelFactory
+import com.example.util.BiometricAuthManager
 import com.example.util.PriceAlertNotificationManager
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+    private lateinit var biometricAuthManager: BiometricAuthManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        biometricAuthManager = BiometricAuthManager(applicationContext)
 
         val database = AppDatabase.getDatabase(applicationContext)
         val notificationManager = PriceAlertNotificationManager(applicationContext)
@@ -68,18 +80,44 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme {
                 val viewModel: MainViewModel = viewModel(factory = viewModelFactory)
                 LaunchedEffect(Unit) {
+                    val status = biometricAuthManager.checkBiometricAvailability()
+                    viewModel.setBiometricStatus(status)
                     if (openScreenExtra == "PRICE_ALERTS") {
                         viewModel.navigateToScreen(AppScreen.PRICE_ALERTS)
                     }
                 }
-                AglSuperAgentApp(viewModel = viewModel)
+                AglSuperAgentApp(
+                    viewModel = viewModel,
+                    onTriggerBiometricAuth = { onSuccess ->
+                        biometricAuthManager.promptBiometricAuthentication(
+                            activity = this@MainActivity,
+                            title = "AGL Biometric Security Vault",
+                            subtitle = "Authenticate to unlock wallet balances",
+                            description = "Scan your fingerprint or enter device passcode to reveal sensitive balances.",
+                            onSuccess = {
+                                viewModel.unlockWallet()
+                                onSuccess()
+                            },
+                            onError = { _, errString ->
+                                viewModel.setBiometricAuthError(errString.toString())
+                                viewModel.showSnackbar("Biometric authentication cancelled: $errString")
+                            },
+                            onFailed = {
+                                viewModel.showSnackbar("Biometric recognition failed. Please try again.")
+                            }
+                        )
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-fun AglSuperAgentApp(viewModel: MainViewModel) {
+fun AglSuperAgentApp(
+    viewModel: MainViewModel,
+    onTriggerBiometricAuth: (onSuccess: () -> Unit) -> Unit = {}
+) {
     val uiState by viewModel.uiState.collectAsState()
     val wallets by viewModel.wallets.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
@@ -177,6 +215,7 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
                 }
 
                 AppScreen.WALLET -> {
+                    val context = LocalContext.current
                     WalletScreen(
                         activeWalletAddress = uiState.activeWalletAddress,
                         liveWalletState = uiState.liveWalletState,
@@ -186,7 +225,7 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
                         transactions = transactions,
                         wallets = wallets,
                         onSwitchWallet = { addr -> viewModel.switchActiveWallet(addr) },
-                        onConnectWalletClick = { viewModel.setShowConnectWalletDialog(true) },
+                        onConnectWalletClick = { viewModel.setConnectWalletDialogVisible(true) },
                         onDisconnectWallet = { viewModel.disconnectWallet() },
                         onAddWalletClick = { viewModel.setShowAddWalletDialog(true) },
                         onRefresh = { viewModel.refreshData() },
@@ -200,7 +239,19 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
                         onShowSnackbar = { msg -> viewModel.showSnackbar(msg) },
                         isIndexingTransactions = uiState.isIndexingTransactions,
                         indexerStatus = uiState.indexerStatusMessage,
-                        onRefreshTransactions = { viewModel.refreshRecentTransactions() }
+                        onRefreshTransactions = { viewModel.refreshRecentTransactions() },
+                        isWalletUnlocked = uiState.isWalletUnlocked,
+                        isBiometricLockEnabled = uiState.isWalletBiometricLockEnabled,
+                        biometricStatus = uiState.biometricStatus,
+                        onUnlockWithBiometrics = {
+                            onTriggerBiometricAuth { }
+                        },
+                        onLockWallet = { viewModel.lockWallet() },
+                        onToggleBiometricLock = { enabled -> viewModel.toggleBiometricLock(enabled) },
+                        onOpenSwapModal = { viewModel.setSwapDialogVisible(true) },
+                        onOpenTransferModal = { viewModel.setTransferDialogVisible(true) },
+                        onOpenReceiveModal = { viewModel.setReceiveDialogVisible(true) },
+                        onOpenBuyModal = { viewModel.setBuyDialogVisible(true) }
                     )
                 }
 
@@ -212,12 +263,25 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
                         isThinking = uiState.isAiThinking,
                         onSendMessage = { text -> viewModel.sendChatMessage(text) },
                         onClearChat = { viewModel.clearChatHistory() },
+                        selectedPersona = uiState.selectedAiPersona,
+                        onSelectPersona = { persona -> viewModel.setAiPersona(persona) },
+                        isSearchGroundingEnabled = uiState.isGoogleSearchGroundingEnabled,
+                        onToggleSearchGrounding = { enabled -> viewModel.toggleGoogleSearchGrounding(enabled) },
                         contractResult = uiState.contractAnalysisResult,
                         isAnalyzingContract = uiState.isAnalyzingContract,
                         onAnalyzeContract = { addr -> viewModel.analyzeContract(addr) },
+                        deepAuditResult = uiState.deepContractAuditResult,
+                        isDeepAuditing = uiState.isDeepAuditingContract,
+                        onDeepAudit = { code, isSolidity -> viewModel.auditSolidityCodeDeep(code, isSolidity) },
                         securityReport = uiState.securityAuditResult,
                         isAuditingSecurity = uiState.isAuditingSecurity,
                         onAuditSecurity = { target -> viewModel.auditSecurity(target) },
+                        portfolioPlan = uiState.portfolioStrategyResult,
+                        isGeneratingPortfolioPlan = uiState.isGeneratingPortfolioPlan,
+                        onGeneratePortfolioPlan = { viewModel.generateDeFiPortfolioRebalance() },
+                        marketRadar = uiState.marketRadarData,
+                        isLoadingMarketRadar = uiState.isLoadingMarketRadar,
+                        onFetchMarketRadar = { topic -> viewModel.fetchLiveBaseMarketRadar(topic) },
                         suggestions = uiState.aiSuggestions,
                         selectedSuggestionCategory = uiState.selectedAiSuggestionCategory,
                         onSelectSuggestionCategory = { cat -> viewModel.selectAiSuggestionCategory(cat) },
@@ -430,15 +494,70 @@ fun AglSuperAgentApp(viewModel: MainViewModel) {
                 )
             }
 
-            // Connect Wallet Dialog
+            // Multi-Wallet Connection Modal
             if (uiState.showConnectWalletDialog) {
-                ConnectWalletDialog(
-                    currentAddress = uiState.activeWalletAddress,
-                    isLoading = uiState.isFetchingLiveBalances,
-                    onDismiss = { viewModel.setShowConnectWalletDialog(false) },
-                    onConnect = { address, label ->
-                        viewModel.connectWallet(address, label)
+                val context = LocalContext.current
+                ConnectWalletModal(
+                    onDismiss = { viewModel.setConnectWalletDialogVisible(false) },
+                    onCreateVaultAccount = { label ->
+                        viewModel.createKeyVaultAccount(context, label)
+                    },
+                    onImportPrivateKey = { pk, label ->
+                        viewModel.importPrivateKeyVault(context, pk, label)
+                    },
+                    onConnectCoinbase = { addr ->
+                        viewModel.connectCoinbaseWallet(addr)
+                    },
+                    onConnectMetaMask = { addr ->
+                        viewModel.connectMetaMask(addr)
+                    },
+                    onConnectWatchOnly = { addr ->
+                        viewModel.connectWallet(addr, "Watch-Only Account")
                     }
+                )
+            }
+
+            // Interactive DEX Aggregator Swap Modal (Aerodrome & Uniswap V3 on Base)
+            if (uiState.showSwapDialog) {
+                val context = LocalContext.current
+                DexSwapModal(
+                    onDismiss = { viewModel.setSwapDialogVisible(false) },
+                    dexService = BlockchainService.dexAggregatorService,
+                    userAddress = uiState.activeWalletAddress,
+                    onExecuteSwap = { quote, onDone ->
+                        viewModel.executeDexSwap(context, quote, onDone)
+                    },
+                    onExecuteApprove = { tokenAddr, spenderAddr, onDone ->
+                        viewModel.executeTokenApprove(context, tokenAddr, spenderAddr, onDone)
+                    }
+                )
+            }
+
+            // Interactive Transfer Modal
+            if (uiState.showTransferDialog) {
+                val context = LocalContext.current
+                TransferModal(
+                    onDismiss = { viewModel.setTransferDialogVisible(false) },
+                    senderAddress = uiState.activeWalletAddress,
+                    onExecuteTransfer = { token, recipient, amount, onDone ->
+                        viewModel.executeTokenTransfer(context, token, recipient, amount, onDone)
+                    }
+                )
+            }
+
+            // Receive & QR Modal
+            if (uiState.showReceiveDialog) {
+                ReceiveModal(
+                    walletAddress = uiState.activeWalletAddress,
+                    onDismiss = { viewModel.setReceiveDialogVisible(false) }
+                )
+            }
+
+            // Buy & On-ramp Modal
+            if (uiState.showBuyDialog) {
+                BuyCryptoModal(
+                    walletAddress = uiState.activeWalletAddress,
+                    onDismiss = { viewModel.setBuyDialogVisible(false) }
                 )
             }
 
