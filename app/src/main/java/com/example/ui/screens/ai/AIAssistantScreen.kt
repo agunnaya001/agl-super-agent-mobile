@@ -187,6 +187,18 @@ fun AIAssistantScreen(
                 modifier = Modifier.testTag("tab_ai_chat")
             )
             Tab(
+                selected = currentTab == AiSubTab.WEB3_LEARNING,
+                onClick = { onTabSelected(AiSubTab.WEB3_LEARNING) },
+                text = {
+                    Text(
+                        text = "🎓 Web3 Learning",
+                        fontWeight = if (currentTab == AiSubTab.WEB3_LEARNING) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = 12.sp
+                    )
+                },
+                modifier = Modifier.testTag("tab_ai_learning")
+            )
+            Tab(
                 selected = currentTab == AiSubTab.PORTFOLIO_REBALANCE,
                 onClick = {
                     onTabSelected(AiSubTab.PORTFOLIO_REBALANCE)
@@ -220,12 +232,12 @@ fun AIAssistantScreen(
                 onClick = { onTabSelected(AiSubTab.SECURITY_AUDIT) },
                 text = {
                     Text(
-                        text = "🛡️ Drainer Sentinel",
+                        text = "🛡️ Audit",
                         fontWeight = if (currentTab == AiSubTab.SECURITY_AUDIT) FontWeight.Bold else FontWeight.Normal,
                         fontSize = 12.sp
                     )
                 },
-                modifier = Modifier.testTag("tab_ai_security")
+                modifier = Modifier.testTag("tab_ai_audit")
             )
             Tab(
                 selected = currentTab == AiSubTab.MARKET_RADAR,
@@ -266,6 +278,11 @@ fun AIAssistantScreen(
                     isSpeaking = isSpeaking
                 )
             }
+            AiSubTab.WEB3_LEARNING -> {
+                Web3LearningContent(
+                    onJumpToAudit = { onTabSelected(AiSubTab.SECURITY_AUDIT) }
+                )
+            }
             AiSubTab.PORTFOLIO_REBALANCE -> {
                 DeFiPortfolioRebalanceContent(
                     planText = portfolioPlan,
@@ -291,7 +308,9 @@ fun AIAssistantScreen(
                 SecurityAuditContent(
                     report = securityReport,
                     isAuditing = isAuditingSecurity,
-                    onAudit = onAuditSecurity
+                    onAudit = onAuditSecurity,
+                    voiceHelper = voiceHelper,
+                    isSpeaking = isSpeaking
                 )
             }
             AiSubTab.MARKET_RADAR -> {

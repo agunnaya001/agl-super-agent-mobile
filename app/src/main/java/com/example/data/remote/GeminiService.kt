@@ -253,6 +253,70 @@ class GeminiServiceClient {
         }
     }
 
+    suspend fun auditContractSecurityVulnerabilities(
+        contractAddress: String
+    ): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val systemPrompt = """
+                You are the AGL Super Agent Senior Smart Contract Security Auditor on Base Mainnet (Chain ID 8453, OP Stack L2).
+                Your task is to analyze the smart contract address on Base Mainnet and generate a rigorous, structured vulnerability summary report.
+
+                You must format your response with markdown:
+                ### 🛡️ Smart Contract Security Vulnerability Audit
+                **Target Address**: `$contractAddress`
+                **Network**: Base Mainnet (Chain ID: 8453)
+
+                #### 1. 📊 Executive Risk Assessment
+                - **Safety Score**: [0-100] / 100
+                - **Risk Rating**: [SAFE / LOW CONCERN / REVIEW NEEDED / HIGH CONCERN / CRITICAL]
+                - **Contract Archetype**: [ERC-20 Token / Governance / DEX Pool / Vault / Custom Contract]
+
+                #### 2. 🚨 Potential Vulnerabilities & Threat Vectors
+                - **Reentrancy Protection**: State variable update ordering, checks-effects-interactions, and nonReentrant guards.
+                - **Access Control & Centralized Roles**: Owner privileges, arbitrary minting, pause/unpause locks, blacklist mechanisms, or treasury withdrawal backdoors.
+                - **Honeypot & Economic Traps**: Fee-on-transfer hidden taxes, max transaction/wallet limits, and liquidity drain risks.
+                - **Arithmetic & Call Integrity**: Integer overflow/underflow protections, unchecked low-level calls, and delegatecall safety.
+                - **Front-Running / MEV Vulnerability**: Sandwich attack susceptibility, slippage guards, and oracle manipulation risks.
+
+                #### 3. ⚡ Base L2 Specific Considerations
+                - Sequencer uptime dependencies, L1 data fee (EIP-4844 blobs) optimizations, and standard EVM opcode compatibility.
+
+                #### 4. 💡 Actionable Security Recommendations
+                - Clear, prioritized checklist for users before interacting or approving token allowances.
+            """.trimIndent()
+
+            val prompt = "Perform a smart contract security vulnerability audit for contract address on Base Mainnet: $contractAddress"
+
+            val res = askAssistant(
+                systemPrompt = systemPrompt,
+                history = emptyList(),
+                userPrompt = prompt,
+                enableSearchGrounding = false,
+                model = MODEL_PRO
+            )
+
+            if (res.isSuccess) {
+                Result.success(res.getOrThrow().text)
+            } else {
+                // Fallback to flash if pro fails or rate limited
+                val fallbackRes = askAssistant(
+                    systemPrompt = systemPrompt,
+                    history = emptyList(),
+                    userPrompt = prompt,
+                    enableSearchGrounding = false,
+                    model = MODEL_FLASH
+                )
+                if (fallbackRes.isSuccess) {
+                    Result.success(fallbackRes.getOrThrow().text)
+                } else {
+                    Result.failure(res.exceptionOrNull() ?: Exception("Security audit failed"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun generateDeFiPortfolioPlan(
         walletAddress: String,
         balancesSummary: String

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
@@ -59,6 +60,7 @@ import com.example.data.remote.blockchain.config.BaseBlockchainConfig
 import com.example.data.remote.blockchain.services.DexAggregatorService
 import com.example.data.remote.blockchain.services.DexQuote
 import com.example.data.remote.blockchain.services.SwapToken
+import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.BaseBlue
 import com.example.ui.theme.BaseCyan
 import com.example.ui.theme.DarkBackground
@@ -519,6 +521,38 @@ fun DexSwapModal(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
+                    val swapAmtNum = amountInText.toDoubleOrNull() ?: 0.0
+                    val swapEstUsd = swapAmtNum * tokenIn.basePriceUsd
+                    val isSwapHighValue = swapEstUsd >= 100.0 || (swapAmtNum >= 0.05 && tokenIn.symbol == "ETH") || (swapAmtNum >= 100.0 && tokenIn.symbol == "AGL")
+
+                    if (isSwapHighValue && swapAmtNum > 0) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 10.dp)
+                                .testTag("swap_high_value_pill"),
+                            colors = CardDefaults.cardColors(containerColor = AmberWarning.copy(alpha = 0.15f)),
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AmberWarning.copy(alpha = 0.4f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Default.Security, contentDescription = null, tint = AmberWarning, modifier = Modifier.size(14.dp))
+                                Text(
+                                    text = "High-Value Swap (≈ $%.2f USD): Secondary Biometrics Enforced".format(swapEstUsd),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AmberWarning
+                                )
+                            }
+                        }
+                    }
+
                     Button(
                         onClick = {
                             if (currentQuote == null) return@Button
@@ -546,15 +580,20 @@ fun DexSwapModal(
 
         // Biometric Security Guard Overlay before broadcasting on Base
         if (showBiometricAuthOverlay && currentQuote != null) {
+            val swapAmtNum = amountInText.toDoubleOrNull() ?: 0.0
+            val swapEstUsd = swapAmtNum * tokenIn.basePriceUsd
+            val isSwapHighValue = swapEstUsd >= 100.0 || (swapAmtNum >= 0.05 && tokenIn.symbol == "ETH") || (swapAmtNum >= 100.0 && tokenIn.symbol == "AGL")
             TransactionBiometricAuthOverlay(
                 details = TransactionBiometricDetails(
-                    title = "Authorize Base DEX Swap",
+                    title = if (isSwapHighValue) "Authorize High-Value DEX Swap" else "Authorize Base DEX Swap",
                     actionType = "SWAP",
-                    primaryAmount = "$amountInText ${tokenIn.symbol}",
+                    primaryAmount = "$amountInText ${tokenIn.symbol} (≈ $%.2f USD)".format(swapEstUsd),
                     secondaryAmount = "≈ ${currentQuote!!.formattedAmountOut} ${tokenOut.symbol}",
                     recipientOrTarget = currentQuote!!.routerAddress,
                     protocolOrSpender = currentQuote!!.protocolName,
-                    estimatedGas = "~$%.4f USD".format(currentQuote!!.estimatedGasUsd)
+                    estimatedGas = "~$%.4f USD".format(currentQuote!!.estimatedGasUsd),
+                    isHighValue = isSwapHighValue,
+                    highValueWarning = if (isSwapHighValue) "Swap value exceeds $100 USD (≈ $%.2f USD). Secondary hardware biometric verification is strictly required before broadcasting to Base Mainnet.".format(swapEstUsd) else null
                 ),
                 onAuthorized = {
                     showBiometricAuthOverlay = false

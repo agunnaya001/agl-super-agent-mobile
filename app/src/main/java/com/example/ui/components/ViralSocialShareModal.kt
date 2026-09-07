@@ -86,8 +86,8 @@ fun ViralSocialShareModal(
     val clipboardManager = LocalClipboardManager.current
     var copiedText by remember { mutableStateOf(false) }
 
-    val frameUrl = "https://farcaster.frame.agunnayalabs.io/agent/0xD034E94465Db1669f80D817c66e58cF194d027C8"
-    val shareText = "🚀 Check out my AGL Super Agent on Base! Automated DEX arbitrage, 84.5% Aerodrome APY yield & 1-click smart audits. Join the AI revolution on Base Mainnet! \$AGL #Base #AIAgent"
+    val frameUrl = "https://aglprotocol.xyz/agent/0xD034E94465Db1669f80D817c66e58cF194d027C8"
+    val shareText = "🚀 Check out my AGL Super Agent on https://aglprotocol.xyz! Automated DEX arbitrage, 84.5% Aerodrome APY yield & 1-click smart audits. Join the AI revolution on Base Mainnet! \$AGL #Base #AIAgent"
 
     val soulboundNfts = remember {
         listOf(

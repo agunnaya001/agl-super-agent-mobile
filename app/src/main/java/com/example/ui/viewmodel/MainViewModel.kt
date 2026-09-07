@@ -59,6 +59,7 @@ enum class AppScreen {
 
 enum class AiSubTab {
     CHAT,
+    WEB3_LEARNING,
     PORTFOLIO_REBALANCE,
     CONTRACT_ANALYZER,
     SECURITY_AUDIT,

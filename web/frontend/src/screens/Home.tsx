@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { Screen } from "../types";
 import { fmtUsd, fmtNum, timeAgo, statusPill, shortAddr, Markdown } from "../ui";
+import { WalkthroughModal } from "../components/WalkthroughModal";
 
 export function HomeScreen({ wallet, navigate }: { wallet: string; navigate: (s: Screen) => void }) {
   const [portfolio, setPortfolio] = useState<any>(null);
@@ -9,6 +10,7 @@ export function HomeScreen({ wallet, navigate }: { wallet: string; navigate: (s:
   const [txs, setTxs] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showWalkthrough, setShowWalkthrough] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -31,6 +33,43 @@ export function HomeScreen({ wallet, navigate }: { wallet: string; navigate: (s:
 
   return (
     <div>
+      {showWalkthrough && (
+        <WalkthroughModal
+          onClose={() => setShowWalkthrough(false)}
+          onNavigate={navigate}
+        />
+      )}
+
+      {/* New User Walkthrough / Help Banner */}
+      <div
+        className="card"
+        style={{
+          background: "linear-gradient(135deg, rgba(0, 210, 255, 0.12), rgba(168, 85, 247, 0.12))",
+          borderColor: "rgba(0, 210, 255, 0.35)",
+          padding: "12px 16px",
+          marginBottom: 12,
+        }}
+      >
+        <div className="row between" style={{ alignItems: "center" }}>
+          <div className="row gap">
+            <span style={{ fontSize: 20 }}>💡</span>
+            <div>
+              <div className="bold small">New to AGL Super Agent?</div>
+              <div className="tiny muted">
+                Explore key features: AI Agent, Wallet Analytics & 30-Day Trends
+              </div>
+            </div>
+          </div>
+          <button
+            className="btn cyan"
+            style={{ fontSize: 11, padding: "6px 12px", fontWeight: 700 }}
+            onClick={() => setShowWalkthrough(true)}
+          >
+            Start Tour 🚀
+          </button>
+        </div>
+      </div>
+
       {/* Portfolio hero */}
       <div className="card card-elev">
         <div className="small muted">Total Portfolio Value</div>
@@ -56,7 +95,7 @@ export function HomeScreen({ wallet, navigate }: { wallet: string; navigate: (s:
       <div style={{ height: 8 }} />
       <div className="metrics">
         <button className="btn ghost" onClick={() => navigate("STAKING")}>💎 Staking</button>
-        <button className="btn ghost" onClick={() => navigate("GOVERNANCE")}>🏛️ Governance</button>
+        <button className="btn ghost" onClick={() => setShowWalkthrough(true)}>❓ Help & Tour</button>
       </div>
 
       {/* Ecosystem stats */}

@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material.icons.filled.NotificationsActive
@@ -39,6 +40,10 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +66,7 @@ import com.example.ui.components.GlassCard
 import com.example.ui.components.RecentTransactionsComponent
 import com.example.ui.components.StatCard
 import com.example.ui.components.TransactionRow
+import com.example.ui.components.WalkthroughHelpModal
 import com.example.ui.components.Web3PortfolioChart
 import com.example.ui.theme.BaseBlue
 import com.example.ui.theme.BaseCyan
@@ -71,6 +77,7 @@ import com.example.ui.theme.DarkCard
 import com.example.ui.theme.DarkCardElevated
 import com.example.ui.theme.GoldRewards
 import com.example.ui.theme.NeonEmerald
+import com.example.ui.theme.RadiantPurple
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -103,6 +110,18 @@ fun HomeScreen(
     onShowSnackbar: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var showWalkthroughModal by remember { mutableStateOf(false) }
+
+    if (showWalkthroughModal) {
+        WalkthroughHelpModal(
+            onDismiss = { showWalkthroughModal = false },
+            onNavigate = { screen ->
+                showWalkthroughModal = false
+                onNavigate(screen)
+            }
+        )
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -112,6 +131,13 @@ fun HomeScreen(
     ) {
         item {
             Spacer(modifier = Modifier.height(4.dp))
+            // New User Walkthrough / Guide Banner
+            NewUserWalkthroughBanner(
+                onStartTour = { showWalkthroughModal = true }
+            )
+        }
+
+        item {
             // Hero Portfolio Card
             HeroPortfolioSection(
                 portfolioSummary = portfolioSummary,
@@ -226,6 +252,106 @@ fun HomeScreen(
 
         item {
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+fun NewUserWalkthroughBanner(
+    onStartTour: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onStartTour() }
+            .testTag("walkthrough_banner_card"),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = DarkCardElevated
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Brush.horizontalGradient(
+                listOf(BaseCyan.copy(alpha = 0.6f), RadiantPurple.copy(alpha = 0.6f))
+            )
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(BaseCyan.copy(alpha = 0.15f))
+                        .border(1.dp, BaseCyan.copy(alpha = 0.3f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = BaseCyan,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "New User Guide",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = BaseCyan.copy(alpha = 0.2f)
+                        ) {
+                            Text(
+                                text = "1-MIN TOUR",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = BaseCyan,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Learn about AI Agent, Wallet Analytics & 30-Day Trends",
+                        fontSize = 11.sp,
+                        color = TextSecondary,
+                        lineHeight = 15.sp
+                    )
+                }
+            }
+
+            Button(
+                onClick = onStartTour,
+                colors = ButtonDefaults.buttonColors(containerColor = BaseCyan),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                modifier = Modifier.testTag("start_tour_button")
+            ) {
+                Text(
+                    text = "Start Tour 🚀",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DarkBackground
+                )
+            }
         }
     }
 }

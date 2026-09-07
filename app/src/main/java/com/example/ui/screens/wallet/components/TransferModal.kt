@@ -43,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
@@ -56,6 +57,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.data.remote.blockchain.config.BaseBlockchainConfig
 import com.example.data.remote.blockchain.services.DexAggregatorService
 import com.example.data.remote.blockchain.services.SwapToken
+import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.BaseBlue
 import com.example.ui.theme.BaseCyan
 import com.example.ui.theme.DarkBackground
@@ -333,6 +335,38 @@ fun TransferModal(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Submit Button
+                    val currentAmt = amountText.toDoubleOrNull() ?: 0.0
+                    val currentEstUsd = currentAmt * selectedToken.basePriceUsd
+                    val isCurrentHighValue = currentEstUsd >= 100.0 || (currentAmt >= 0.05 && selectedToken.symbol == "ETH") || (currentAmt >= 100.0 && selectedToken.symbol == "AGL")
+
+                    if (isCurrentHighValue && currentAmt > 0) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 10.dp)
+                                .testTag("transfer_high_value_pill"),
+                            colors = CardDefaults.cardColors(containerColor = AmberWarning.copy(alpha = 0.15f)),
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AmberWarning.copy(alpha = 0.4f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Default.Security, contentDescription = null, tint = AmberWarning, modifier = Modifier.size(14.dp))
+                                Text(
+                                    text = "High-Value Transfer (≈ $%.2f USD): Secondary Biometrics Required".format(currentEstUsd),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AmberWarning
+                                )
+                            }
+                        }
+                    }
+
                     Button(
                         onClick = {
                             val amt = amountText.toDoubleOrNull() ?: 0.0
@@ -374,14 +408,17 @@ fun TransferModal(
             val amt = amountText.toDoubleOrNull() ?: 0.0
             val recip = recipientAddress.trim()
             val estUsdValue = amt * selectedToken.basePriceUsd
+            val isHighValue = estUsdValue >= 100.0 || (amt >= 0.05 && selectedToken.symbol == "ETH") || (amt >= 100.0 && selectedToken.symbol == "AGL")
             TransactionBiometricAuthOverlay(
                 details = TransactionBiometricDetails(
-                    title = "Authorize Token Transfer",
+                    title = if (isHighValue) "Authorize High-Value Transfer" else "Authorize Token Transfer",
                     actionType = "TRANSFER",
                     primaryAmount = "$amountText ${selectedToken.symbol}",
                     secondaryAmount = "≈ $%.2f USD".format(estUsdValue),
                     recipientOrTarget = recip,
-                    estimatedGas = "< $0.005 USD (Base L2)"
+                    estimatedGas = "< $0.005 USD (Base L2)",
+                    isHighValue = isHighValue,
+                    highValueWarning = if (isHighValue) "Transaction value exceeds $100 USD threshold (≈ $%.2f USD). Secondary biometric authentication is required before on-chain signing.".format(estUsdValue) else null
                 ),
                 onAuthorized = {
                     showBiometricAuthOverlay = false

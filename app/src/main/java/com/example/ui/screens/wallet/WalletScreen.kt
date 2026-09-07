@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.Token
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import com.example.util.BiometricCapabilityStatus
+import com.example.ui.screens.wallet.components.PrivateKeyBiometricAuthModal
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -55,8 +56,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -145,6 +148,11 @@ fun WalletScreen(
     var selectedWalletTab by remember { mutableStateOf(0) } // 0 = Assets, 1 = Real-Time AGL/wAGL, 2 = Activity, 3 = Brand Kit
     var selectedTxFilter by remember { mutableStateOf<TransactionType?>(null) }
     val isSensitiveDataHidden = isBiometricLockEnabled && !isWalletUnlocked
+    var showPrivateKeyAuthModal by remember { mutableStateOf(false) }
+
+    val activeWalletEntity = remember(wallets, activeWalletAddress) {
+        wallets.find { it.address.equals(activeWalletAddress, ignoreCase = true) }
+    }
 
     val filteredTransactions = remember(transactions, selectedTxFilter) {
         if (selectedTxFilter == null) {
@@ -217,6 +225,19 @@ fun WalletScreen(
                 onOpenBuyModal = onOpenBuyModal,
                 onRefresh = onRefresh,
                 onShowSnackbar = onShowSnackbar
+            )
+        }
+
+        item {
+            // High-Security Biometric Vault & Transaction Verification Card
+            WalletBiometricSecurityCard(
+                isBiometricEnabled = isBiometricLockEnabled,
+                isUnlocked = isWalletUnlocked,
+                activeWallet = activeWalletEntity,
+                hasVaultAccounts = wallets.any { it.encryptedPrivateKey != null },
+                onViewPrivateKey = { showPrivateKeyAuthModal = true },
+                onUnlockWithBiometrics = onUnlockWithBiometrics,
+                onLockWallet = onLockWallet
             )
         }
 
@@ -454,6 +475,16 @@ fun WalletScreen(
         item {
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+
+    // Modal requiring secondary biometric verification before displaying private keys
+    if (showPrivateKeyAuthModal) {
+        PrivateKeyBiometricAuthModal(
+            activeAccount = activeWalletEntity,
+            allAccounts = wallets,
+            onDismiss = { showPrivateKeyAuthModal = false },
+            onShowSnackbar = onShowSnackbar
+        )
     }
 }
 
@@ -1311,3 +1342,182 @@ fun BrandingKitSection(
         }
     }
 }
+
+@Composable
+fun WalletBiometricSecurityCard(
+    isBiometricEnabled: Boolean,
+    isUnlocked: Boolean,
+    activeWallet: WalletAccountEntity?,
+    hasVaultAccounts: Boolean,
+    onViewPrivateKey: () -> Unit,
+    onUnlockWithBiometrics: () -> Unit,
+    onLockWallet: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .testTag("wallet_biometric_security_card"),
+        colors = CardDefaults.cardColors(containerColor = DarkCardElevated),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                colors = listOf(BaseCyan.copy(alpha = 0.6f), BaseBlue.copy(alpha = 0.3f))
+            )
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(BaseCyan.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Fingerprint,
+                            contentDescription = null,
+                            tint = BaseCyan,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "Biometric Vault & High-Value Guard",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = if (isBiometricEnabled) "Secondary Hardware Verification Active" else "Biometric Security Available",
+                            fontSize = 11.sp,
+                            color = if (isBiometricEnabled) NeonEmerald else TextMuted
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(
+                            if (isUnlocked) NeonEmerald.copy(alpha = 0.15f)
+                            else AmberWarning.copy(alpha = 0.15f)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = if (isUnlocked) "UNLOCKED" else "LOCKED",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isUnlocked) NeonEmerald else AmberWarning
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = "Android Keystore protects private key vault items. Secondary biometric prompt is automatically triggered for viewing raw keys or confirming high-value transactions (≥ $100 USD).",
+                fontSize = 11.sp,
+                color = TextSecondary,
+                lineHeight = 16.sp
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onViewPrivateKey,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .testTag("btn_view_private_key_biometric"),
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BaseCyan)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Security,
+                        contentDescription = null,
+                        tint = BaseCyan,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "View Private Key",
+                        color = BaseCyan,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (!isUnlocked) {
+                    Button(
+                        onClick = onUnlockWithBiometrics,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .testTag("btn_unlock_biometrics"),
+                        colors = ButtonDefaults.buttonColors(containerColor = BaseBlue),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Fingerprint,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Unlock Vault",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = onLockWallet,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .testTag("btn_lock_biometrics"),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, DarkBorder)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = TextMuted,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Lock Vault",
+                            color = TextMuted,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+

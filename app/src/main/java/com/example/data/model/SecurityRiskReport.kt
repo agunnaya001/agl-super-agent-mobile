@@ -9,7 +9,8 @@ data class SecurityRiskReport(
     val reasons: List<String>,
     val flags: List<RiskFlag>,
     val recommendations: List<String>,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val aiVulnerabilitySummary: String? = null
 )
 
 enum class SecurityTargetType {

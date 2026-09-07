@@ -79,6 +79,9 @@ import com.example.ui.theme.GoldRewards
 import com.example.ui.theme.NeonEmerald
 import com.example.ui.theme.RiskLowBg
 import com.example.ui.theme.RiskLowBorder
+import com.example.ui.theme.RiskHighBg
+import com.example.ui.theme.RiskHighBorder
+import com.example.ui.theme.DangerCrimson
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -97,7 +100,9 @@ data class TransactionBiometricDetails(
     val network: String = "Base Mainnet (Chain ID 8453)",
     val estimatedGas: String = "< $0.005 USD",
     val protocolOrSpender: String? = null,
-    val securityLevel: String = "TEE Hardware Keystore Secured"
+    val securityLevel: String = "TEE Hardware Keystore Secured",
+    val isHighValue: Boolean = false,
+    val highValueWarning: String? = null
 )
 
 enum class BiometricAuthState {
@@ -392,6 +397,47 @@ fun TransactionBiometricAuthOverlay(
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
+
+                    if (details.isHighValue) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .testTag("high_value_warning_card"),
+                            colors = CardDefaults.cardColors(containerColor = RiskHighBg),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, RiskHighBorder)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = "High Value Alert",
+                                    tint = DangerCrimson,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "HIGH-VALUE TRANSACTION",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = DangerCrimson
+                                    )
+                                    Text(
+                                        text = details.highValueWarning ?: "Secondary biometric authentication is strictly required for this transaction before signing and broadcasting on Base Mainnet.",
+                                        fontSize = 11.sp,
+                                        color = DangerCrimson.copy(alpha = 0.9f),
+                                        lineHeight = 15.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     // Transaction Summary Card
                     Card(

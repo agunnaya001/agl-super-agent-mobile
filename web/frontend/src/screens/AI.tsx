@@ -1,26 +1,30 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { Markdown } from "../ui";
+import { Web3LearningModule } from "../components/Web3LearningModule";
 
 type Msg = { role: "user" | "agent"; text: string };
+type TabType = "CHAT" | "LEARN" | "ANALYZER" | "AUDIT";
 
 export function AIScreen() {
-  const [tab, setTab] = useState<"CHAT" | "ANALYZER" | "AUDIT">("CHAT");
+  const [tab, setTab] = useState<TabType>("CHAT");
   return (
     <div>
       <div className="tabs">
         <button className={`tab ${tab === "CHAT" ? "active" : ""}`} onClick={() => setTab("CHAT")}>💬 Chat</button>
+        <button className={`tab ${tab === "LEARN" ? "active" : ""}`} onClick={() => setTab("LEARN")}>🎓 Web3 Learning</button>
         <button className={`tab ${tab === "ANALYZER" ? "active" : ""}`} onClick={() => setTab("ANALYZER")}>📜 Contract Analyzer</button>
-        <button className={`tab ${tab === "AUDIT" ? "active" : ""}`} onClick={() => setTab("AUDIT")}>🛡️ Security Audit</button>
+        <button className={`tab ${tab === "AUDIT" ? "active" : ""}`} onClick={() => setTab("AUDIT")}>🛡️ Audit</button>
       </div>
-      {tab === "CHAT" && <ChatTab />}
+      {tab === "CHAT" && <ChatTab onOpenLearn={() => setTab("LEARN")} />}
+      {tab === "LEARN" && <Web3LearningModule onJumpToAudit={() => setTab("AUDIT")} />}
       {tab === "ANALYZER" && <AnalyzerTab />}
       {tab === "AUDIT" && <AuditTab />}
     </div>
   );
 }
 
-function ChatTab() {
+function ChatTab({ onOpenLearn }: { onOpenLearn?: () => void }) {
   const [messages, setMessages] = useState<Msg[]>([
     { role: "agent", text: "Welcome to **AGL Super Agent**! I'm your AI Web3 intelligence command center on Base. Ask me to explain transactions, analyze smart contracts, audit security risks, or guide your Web3 learning." },
   ]);
@@ -48,6 +52,35 @@ function ChatTab() {
 
   return (
     <div>
+      {onOpenLearn && (
+        <div
+          className="card"
+          style={{
+            background: "linear-gradient(135deg, rgba(0,82,255,0.12) 0%, rgba(0,212,255,0.08) 100%)",
+            borderColor: "rgba(0,212,255,0.3)",
+            padding: "10px 14px",
+            marginBottom: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div className="row gap" style={{ gap: 8 }}>
+            <span style={{ fontSize: 18 }}>🎓</span>
+            <div className="small">
+              <strong style={{ color: "var(--cyan)" }}>New to Base Protocols?</strong> Interactive tutorial available.
+            </div>
+          </div>
+          <button
+            className="btn cyan"
+            style={{ width: "auto", fontSize: 11, padding: "5px 10px", whiteSpace: "nowrap" }}
+            onClick={onOpenLearn}
+          >
+            Start Tutorial →
+          </button>
+        </div>
+      )}
+
       <div className="chat-list">
         {messages.map((m, i) => (
           <div key={i} className={`chat-bubble ${m.role === "user" ? "user" : "agent"}`}>
@@ -107,11 +140,28 @@ function AuditTab() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const run = async () => {
-    if (!target.trim()) return;
+  const presets = [
+    { label: "AGL Token", addr: "0xEA1221B4d80A89BD8C75248Fae7c176BD1854698" },
+    { label: "wAGL Gov", addr: "0x356AbeDE92d53D9Fe5165d21A2eEB6c321CEa7b4" },
+    { label: "DAO Timelock", addr: "0x231a47BE13A7862562FE14Fce5b106294aF44aD8" },
+    { label: "Aerodrome Pool", addr: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
+  ];
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) setTarget(text.trim());
+    } catch {
+      // clipboard permission denied or not supported
+    }
+  };
+
+  const run = async (addrToRun?: string) => {
+    const finalAddr = (addrToRun || target).trim();
+    if (!finalAddr) return;
     setLoading(true); setResult("");
     try {
-      const r = await api.auditSecurity(target.trim());
+      const r = await api.auditSecurity(finalAddr);
       setResult(r.reply || r.error || "No result.");
     } catch (e) { setResult(`⚠️ ${(e as Error).message}`); }
     setLoading(false);
@@ -120,12 +170,62 @@ function AuditTab() {
   return (
     <div>
       <div className="card">
-        <div className="small muted" style={{ marginBottom: 8 }}>Audit a wallet address, contract, or transaction hash</div>
-        <input className="input" placeholder="0x… address or tx hash" value={target} onChange={(e) => setTarget(e.target.value)} />
-        <div style={{ height: 10 }} />
-        <button className="btn" disabled={loading} onClick={run}>{loading ? <><span className="loader" style={{ width: 16, height: 16 }} /> Auditing…</> : "🛡️ Run Security Audit"}</button>
+        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>🛡️ Smart Contract Security Audit</div>
+        <div className="small muted" style={{ marginBottom: 12 }}>
+          Paste any smart contract address on Base Mainnet (Chain ID 8453) to summarize potential vulnerabilities using the AI backend.
+        </div>
+        
+        <div className="row gap" style={{ marginBottom: 10 }}>
+          <input
+            className="input"
+            placeholder="0x... contract address on Base"
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+          />
+          <button className="tab" style={{ padding: "0 14px" }} onClick={handlePaste} title="Paste from clipboard">
+            📋 Paste
+          </button>
+        </div>
+
+        <div className="small muted" style={{ marginBottom: 6 }}>Verified Base presets:</div>
+        <div className="row gap" style={{ flexWrap: "wrap", marginBottom: 14 }}>
+          {presets.map((p) => (
+            <button
+              key={p.addr}
+              className="tab"
+              style={{ fontSize: 11, padding: "4px 8px" }}
+              onClick={() => {
+                setTarget(p.addr);
+                run(p.addr);
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        <button className="btn" disabled={loading || !target.trim()} onClick={() => run()}>
+          {loading ? <><span className="loader" style={{ width: 16, height: 16 }} /> Auditing Contract…</> : "🛡️ Run AI Contract Audit"}
+        </button>
       </div>
-      {result && <div className="card"><Markdown text={result} /></div>}
+
+      {result && (
+        <div className="card" style={{ marginTop: 12, position: "relative" }}>
+          <div className="row gap" style={{ justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ fontWeight: 600, fontSize: 13, color: "var(--color-primary, #00d2ff)" }}>
+              AI Vulnerability Report
+            </span>
+            <button
+              className="tab"
+              style={{ fontSize: 11, padding: "2px 8px" }}
+              onClick={() => navigator.clipboard.writeText(result)}
+            >
+              Copy Report
+            </button>
+          </div>
+          <Markdown text={result} />
+        </div>
+      )}
     </div>
   );
 }

@@ -8,6 +8,8 @@ object BaseBlockchainConfig {
     const val NETWORK_NAME = "Base Mainnet"
     const val CURRENCY_SYMBOL = "ETH"
     const val EXPLORER_BASE_URL = "https://basescan.org"
+    const val DOMAIN_NAME = "aglprotocol.xyz"
+    const val PROTOCOL_WEBSITE_URL = "https://aglprotocol.xyz"
 
     // Multi-RPC resilient endpoints with automatic failover
     const val PRIMARY_RPC = "https://mainnet.base.org"

@@ -1,11 +1,13 @@
 package com.example.ui.screens.ai
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,16 +17,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.GppMaybe
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -32,6 +39,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -44,7 +52,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -65,19 +77,26 @@ import com.example.ui.theme.NeonEmerald
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.util.VoiceAssistantHelper
 
 @Composable
 fun SecurityAuditContent(
     report: SecurityRiskReport?,
     isAuditing: Boolean,
-    onAudit: (String) -> Unit
+    onAudit: (String) -> Unit,
+    voiceHelper: VoiceAssistantHelper? = null,
+    isSpeaking: Boolean = false
 ) {
-    var targetInput by remember { mutableStateOf("") }
+    var contractInput by remember { mutableStateOf("") }
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
 
-    val sampleInputs = listOf(
-        Pair("AGL Token Contract", BlockchainService.AGL_TOKEN_CONTRACT),
-        Pair("Watch-Only Wallet", BlockchainService.DEFAULT_DEMO_WALLET),
-        Pair("Suspected Phishing Drainer", "0xdead666bad4488220011aa33445566778899aabb")
+    val sampleContracts = listOf(
+        Pair("AGL Token", BlockchainService.AGL_TOKEN_CONTRACT),
+        Pair("wAGL Gov", BlockchainService.AGL_VOTES_WRAPPER_CONTRACT),
+        Pair("DAO Timelock", BlockchainService.TIMELOCK_CONTRACT),
+        Pair("AGL Credits", BlockchainService.AGL_CREDITS_CONTRACT),
+        Pair("Aerodrome Slipstream", "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913")
     )
 
     LazyColumn(
@@ -88,16 +107,29 @@ fun SecurityAuditContent(
     ) {
         item {
             Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = null,
+                    tint = BaseCyan,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = "Smart Contract Security Audit",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "Web3 Security Sentinel",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-            Text(
-                text = "Audit contracts, token approval permissions, and transaction hashes before signing.",
+                text = "Paste any smart contract address on Base Mainnet (Chain ID 8453) to run an AI-powered security audit and vulnerability summary.",
                 fontSize = 12.sp,
-                color = TextSecondary
+                color = TextSecondary,
+                lineHeight = 16.sp
             )
         }
 
@@ -108,13 +140,51 @@ fun SecurityAuditContent(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
                     .background(DarkCard)
+                    .border(1.dp, DarkBorder, RoundedCornerShape(14.dp))
                     .padding(14.dp)
             ) {
+                Text(
+                    text = "Base Contract Address",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = BaseCyan
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
                 OutlinedTextField(
-                    value = targetInput,
-                    onValueChange = { targetInput = it },
+                    value = contractInput,
+                    onValueChange = { contractInput = it },
                     placeholder = {
-                        Text("Address, Tx Hash, or Spanner (0x...)", fontSize = 12.sp, color = TextMuted)
+                        Text("0x... contract address on Base", fontSize = 12.sp, color = TextMuted)
+                    },
+                    trailingIcon = {
+                        Button(
+                            onClick = {
+                                val text = clipboardManager.getText()?.text
+                                if (!text.isNullOrBlank()) {
+                                    contractInput = text.trim()
+                                    Toast.makeText(context, "Address pasted from clipboard", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "Clipboard is empty", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = BaseBlue.copy(alpha = 0.35f)),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .padding(end = 4.dp)
+                                .testTag("audit_paste_button")
+                        ) {
+                            Icon(
+                                Icons.Default.ContentPaste,
+                                contentDescription = "Paste",
+                                tint = BaseCyan,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("PASTE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = BaseCyan)
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -133,66 +203,79 @@ fun SecurityAuditContent(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // Quick Presets Row
+                Text(
+                    text = "Verified Base Contracts:",
+                    fontSize = 10.sp,
+                    color = TextMuted
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Quick Presets:",
-                            fontSize = 10.sp,
-                            color = TextMuted
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            sampleInputs.forEach { (name, target) ->
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(DarkCardElevated)
-                                        .clickable {
-                                            targetInput = target
-                                            onAudit(target)
-                                        }
-                                        .padding(horizontal = 6.dp, vertical = 3.dp)
-                                ) {
-                                    Text(
-                                        text = name.take(12),
-                                        fontSize = 9.sp,
-                                        color = BaseCyan,
-                                        fontWeight = FontWeight.Medium
-                                    )
+                    items(sampleContracts) { (name, address) ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(DarkCardElevated)
+                                .border(0.5.dp, BaseCyan.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
+                                .clickable {
+                                    contractInput = address
+                                    onAudit(address)
                                 }
-                            }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = name,
+                                fontSize = 10.sp,
+                                color = BaseCyan,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
                     }
+                }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                    Button(
-                        onClick = { onAudit(targetInput) },
-                        enabled = targetInput.isNotBlank() && !isAuditing,
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.testTag("audit_security_submit_button")
-                    ) {
-                        if (isAuditing) {
-                            CircularProgressIndicator(
-                                color = DarkBackground,
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Shield,
-                                contentDescription = null,
-                                tint = DarkBackground,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "Audit", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = DarkBackground)
-                        }
+                Button(
+                    onClick = { onAudit(contractInput) },
+                    enabled = contractInput.isNotBlank() && !isAuditing,
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .testTag("audit_security_submit_button")
+                ) {
+                    if (isAuditing) {
+                        CircularProgressIndicator(
+                            color = DarkBackground,
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Auditing Security on Base...",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = DarkBackground
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Shield,
+                            contentDescription = null,
+                            tint = DarkBackground,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Run AI Security Audit",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = DarkBackground
+                        )
                     }
                 }
             }
@@ -202,7 +285,9 @@ fun SecurityAuditContent(
             item {
                 // Report Header Card with Score
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("audit_score_card"),
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = DarkCardElevated),
                     border = androidx.compose.foundation.BorderStroke(
@@ -222,8 +307,8 @@ fun SecurityAuditContent(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Security Safety Score",
-                                    fontSize = 12.sp,
+                                    text = "Executive Safety Score",
+                                    fontSize = 11.sp,
                                     color = TextSecondary
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
@@ -262,6 +347,92 @@ fun SecurityAuditContent(
                 }
             }
 
+            // AI Vulnerability Summary Report Card
+            if (!report.aiVulnerabilitySummary.isNullOrBlank()) {
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("ai_vulnerability_summary_card"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = DarkCard),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BaseCyan.copy(alpha = 0.35f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Shield,
+                                        contentDescription = null,
+                                        tint = BaseCyan,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "AI Security Vulnerability Summary",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = BaseCyan
+                                    )
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // Audio TTS read-aloud button
+                                    if (voiceHelper != null) {
+                                        IconButton(
+                                            onClick = {
+                                                if (isSpeaking) {
+                                                    voiceHelper.stop()
+                                                } else {
+                                                    voiceHelper.speak(report.aiVulnerabilitySummary)
+                                                }
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isSpeaking) Icons.Default.Stop else Icons.Default.VolumeUp,
+                                                contentDescription = "Read Aloud",
+                                                tint = if (isSpeaking) DangerCrimson else BaseCyan,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // Copy report button
+                                    IconButton(
+                                        onClick = {
+                                            clipboardManager.setText(AnnotatedString(report.aiVulnerabilitySummary))
+                                            Toast.makeText(context, "Audit report copied to clipboard", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ContentCopy,
+                                            contentDescription = "Copy Audit",
+                                            tint = BaseCyan,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Text(
+                                text = report.aiVulnerabilitySummary,
+                                fontSize = 12.sp,
+                                color = TextPrimary,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+                }
+            }
+
             item {
                 // Flags & Threat Vectors
                 Column(
@@ -269,10 +440,11 @@ fun SecurityAuditContent(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(DarkCard)
+                        .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
                         .padding(14.dp)
                 ) {
                     Text(
-                        text = "Telemetry & Risk Flags (${report.flags.size})",
+                        text = "Vulnerability Vectors & Flags (${report.flags.size})",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
@@ -293,10 +465,11 @@ fun SecurityAuditContent(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(DarkCard)
+                        .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
                         .padding(14.dp)
                 ) {
                     Text(
-                        text = "Actionable Recommendations",
+                        text = "Actionable Security Recommendations",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
@@ -344,7 +517,7 @@ fun SecurityAuditContent(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Super Agent Golden Rule",
+                            text = "Super Agent Non-Custodial Verification",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = BaseCyan
@@ -352,7 +525,7 @@ fun SecurityAuditContent(
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "AGL Super Agent operates completely non-custodially. It never requests, stores, or transmits your private keys or seed phrases.",
+                        text = "The AGL Super Agent operates completely non-custodially. It inspects Base Mainnet contract bytecode and execution logic without ever accessing your private keys or seed phrases.",
                         fontSize = 12.sp,
                         color = TextSecondary,
                         lineHeight = 16.sp

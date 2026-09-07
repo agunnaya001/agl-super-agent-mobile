@@ -62,6 +62,7 @@ import com.example.util.PriceAlertNotificationManager
 
 class MainActivity : FragmentActivity() {
     private lateinit var biometricAuthManager: BiometricAuthManager
+    private var mainViewModel: MainViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,15 +76,20 @@ class MainActivity : FragmentActivity() {
         val viewModelFactory = MainViewModelFactory(repository)
 
         val openScreenExtra = intent?.getStringExtra("OPEN_SCREEN")
+        val initialUri = intent?.data
 
         setContent {
             MyApplicationTheme {
                 val viewModel: MainViewModel = viewModel(factory = viewModelFactory)
+                mainViewModel = viewModel
                 LaunchedEffect(Unit) {
                     val status = biometricAuthManager.checkBiometricAvailability()
                     viewModel.setBiometricStatus(status)
                     if (openScreenExtra == "PRICE_ALERTS") {
                         viewModel.navigateToScreen(AppScreen.PRICE_ALERTS)
+                    }
+                    if (initialUri != null) {
+                        handleDeepLinkUri(initialUri, viewModel)
                     }
                 }
                 AglSuperAgentApp(
@@ -109,6 +115,36 @@ class MainActivity : FragmentActivity() {
                     }
                 )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.data?.let { uri ->
+            mainViewModel?.let { vm ->
+                handleDeepLinkUri(uri, vm)
+            }
+        }
+    }
+
+    private fun handleDeepLinkUri(uri: android.net.Uri, viewModel: MainViewModel) {
+        val path = uri.path ?: ""
+        val host = uri.host ?: ""
+        if (host.contains("aglprotocol.xyz") || uri.scheme == "aglprotocol") {
+            when {
+                path.startsWith("/wallet") -> viewModel.navigateToScreen(AppScreen.WALLET)
+                path.startsWith("/monitor") || path.startsWith("/dashboard") -> viewModel.navigateToScreen(AppScreen.DASHBOARD)
+                path.startsWith("/ai") || path.startsWith("/agent") -> viewModel.navigateToScreen(AppScreen.AI_ASSISTANT)
+                path.startsWith("/quests") || path.startsWith("/learn") -> viewModel.navigateToScreen(AppScreen.QUESTS)
+                path.startsWith("/profile") || path.startsWith("/settings") -> viewModel.navigateToScreen(AppScreen.PROFILE)
+                path.startsWith("/swap") -> {
+                    viewModel.navigateToScreen(AppScreen.WALLET)
+                    viewModel.setSwapDialogVisible(true)
+                }
+                else -> viewModel.navigateToScreen(AppScreen.HOME)
+            }
+            viewModel.showSnackbar("Opened via aglprotocol.xyz deep link")
         }
     }
 }
@@ -210,7 +246,10 @@ fun AglSuperAgentApp(
                         onRefresh = { viewModel.refreshData() },
                         onRunDiagnostics = { viewModel.runNetworkDiagnostics() },
                         onNavigate = { screen -> viewModel.navigateToScreen(screen) },
-                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) }
+                        onShowSnackbar = { msg -> viewModel.showSnackbar(msg) },
+                        tokens = uiState.tokens,
+                        onOpenSwapModal = { viewModel.setSwapDialogVisible(true) },
+                        onOpenBridgeModal = { viewModel.setBuyDialogVisible(true) }
                     )
                 }
 

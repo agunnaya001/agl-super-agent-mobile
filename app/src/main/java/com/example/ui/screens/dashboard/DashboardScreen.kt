@@ -46,6 +46,7 @@ import com.example.data.local.entities.UserProgressEntity
 import com.example.data.model.AglEcosystemStats
 import com.example.data.model.AglOraclePriceData
 import com.example.data.model.BaseTransaction
+import com.example.data.model.TokenAsset
 import com.example.data.model.TransactionStatus
 import com.example.data.remote.blockchain.diagnostics.NetworkDiagnosticReport
 import com.example.ui.components.AgentVaultsAndErc6551Component
@@ -92,9 +93,67 @@ fun DashboardScreen(
     onRefresh: () -> Unit,
     onRunDiagnostics: () -> Unit,
     onNavigate: (AppScreen) -> Unit,
-    onShowSnackbar: (String) -> Unit
+    onShowSnackbar: (String) -> Unit,
+    tokens: List<TokenAsset> = emptyList(),
+    onOpenSwapModal: (String) -> Unit = {},
+    onOpenBridgeModal: (String) -> Unit = {}
 ) {
     var showViralModal by remember { mutableStateOf(false) }
+    var selectedTokenForSwap by remember { mutableStateOf<TokenAsset?>(null) }
+    var selectedTokenForBridge by remember { mutableStateOf<TokenAsset?>(null) }
+    var showQuickActionSheet by remember { mutableStateOf(false) }
+
+    val defaultTopAssets = remember {
+        listOf(
+            TokenAsset(
+                symbol = "AGL",
+                name = "Agunnaya Labs Token",
+                balance = 420.5,
+                priceUsd = 3.42,
+                change24h = 8.65,
+                iconEmoji = "🪙",
+                contractAddress = "0x3845badb6b8b0e8957c5efc0576911c750e394f9",
+                isEcosystemToken = true
+            ),
+            TokenAsset(
+                symbol = "ETH",
+                name = "Ethereum (Base Native)",
+                balance = 1.45,
+                priceUsd = 2680.50,
+                change24h = 3.12,
+                iconEmoji = "🔷",
+                contractAddress = "0x0000000000000000000000000000000000000000",
+                isNative = true
+            ),
+            TokenAsset(
+                symbol = "wAGL",
+                name = "Wrapped AGL Votes",
+                balance = 150.0,
+                priceUsd = 3.42,
+                change24h = 8.65,
+                iconEmoji = "🗳️",
+                contractAddress = "0x58c067a5840d25fe3b2aef5c830ff61c9ec41eb0",
+                isEcosystemToken = true
+            ),
+            TokenAsset(
+                symbol = "USDC",
+                name = "USD Coin (Base)",
+                balance = 750.0,
+                priceUsd = 1.00,
+                change24h = 0.02,
+                iconEmoji = "💵",
+                contractAddress = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+            )
+        )
+    }
+
+    val effectiveTopAssets = remember(tokens) {
+        if (tokens.isNotEmpty()) {
+            tokens.sortedByDescending { it.change24h }.take(4)
+        } else {
+            defaultTopAssets
+        }
+    }
 
     if (showViralModal) {
         ViralSocialShareModal(
@@ -103,6 +162,45 @@ fun DashboardScreen(
         )
     }
 
+    if (showQuickActionSheet) {
+        DashboardQuickActionsMenuDialog(
+            topAssets = effectiveTopAssets,
+            onDismiss = { showQuickActionSheet = false },
+            onSelectSwap = { asset ->
+                showQuickActionSheet = false
+                selectedTokenForSwap = asset
+            },
+            onSelectBridge = { asset ->
+                showQuickActionSheet = false
+                selectedTokenForBridge = asset
+            }
+        )
+    }
+
+    selectedTokenForSwap?.let { asset ->
+        DashboardQuickSwapDialog(
+            asset = asset,
+            allAssets = effectiveTopAssets,
+            onDismiss = { selectedTokenForSwap = null },
+            onConfirmSwap = { amountIn, tokenIn, tokenOut, estimatedOut ->
+                selectedTokenForSwap = null
+                onShowSnackbar("Broadcasted Swap: $amountIn $tokenIn → $estimatedOut $tokenOut on Base Mainnet")
+            }
+        )
+    }
+
+    selectedTokenForBridge?.let { asset ->
+        DashboardQuickBridgeDialog(
+            asset = asset,
+            onDismiss = { selectedTokenForBridge = null },
+            onConfirmBridge = { amount, assetSymbol, sourceChain ->
+                selectedTokenForBridge = null
+                onShowSnackbar("Initiated Bridge: $amount $assetSymbol from $sourceChain to Base Mainnet")
+            }
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -295,6 +393,16 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
+        // Quick-Action Grid: Swap & Bridge for Top-Performing Assets
+        item {
+            DashboardQuickActionGrid(
+                topAssets = effectiveTopAssets,
+                onSwapAsset = { asset -> selectedTokenForSwap = asset },
+                onBridgeAsset = { asset -> selectedTokenForBridge = asset }
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
         // Quick Metrics Row
         item {
             Row(
@@ -410,8 +518,16 @@ fun DashboardScreen(
         }
 
         item {
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(84.dp))
         }
+    }
+
+    DashboardQuickActionsFab(
+        onClick = { showQuickActionSheet = true },
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(16.dp)
+    )
     }
 }
 

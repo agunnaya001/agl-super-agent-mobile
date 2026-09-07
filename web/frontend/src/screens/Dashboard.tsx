@@ -1,29 +1,55 @@
 import { useEffect, useState } from "react";
+import { motion, type Variants } from "framer-motion";
 import { api } from "../api";
 import { Screen } from "../types";
 import { fmtUsd, fmtNum, timeAgo, statusPill, shortAddr } from "../ui";
-import { D3BalanceChart } from "../components/D3BalanceChart";
+import { RechartsBalanceTrend } from "../components/RechartsBalanceTrend";
 import { TokenLogo } from "../components/TokenLogo";
 import { AgentVaults } from "../components/AgentVaults";
 import { ViralShareModal } from "../components/ViralShareModal";
+import { DashboardQuickActions } from "../components/DashboardQuickActions";
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.07,
+      delayChildren: 0.04,
+    },
+  },
+};
+
+const cardVariants: Variants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.38,
+      ease: "easeOut",
+    },
+  },
+};
 
 export function DashboardScreen({ wallet, navigate }: { wallet: string; navigate: (s: Screen) => void }) {
   const [status, setStatus] = useState<any>(null);
   const [oracle, setOracle] = useState<any>(null);
   const [eco, setEco] = useState<any>(null);
   const [txs, setTxs] = useState<any[]>([]);
+  const [tokens, setTokens] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
   const load = async () => {
-    const [s, o, e, t, p] = await Promise.all([
+    const [s, o, e, t, p, tok] = await Promise.all([
       api.getStatus().catch(() => null), api.getOracle().catch(() => null),
       api.getEcosystem().catch(() => null), api.getTransactions(wallet).catch(() => []),
-      api.getProfile(wallet).catch(() => null),
+      api.getProfile(wallet).catch(() => null), api.getTokens(wallet).catch(() => []),
     ]);
-    setStatus(s); setOracle(o); setEco(e); setTxs(t); setProfile(p); setLoading(false);
+    setStatus(s); setOracle(o); setEco(e); setTxs(t); setProfile(p); setTokens(tok); setLoading(false);
   };
 
   useEffect(() => { load(); }, [wallet]);
@@ -40,18 +66,26 @@ export function DashboardScreen({ wallet, navigate }: { wallet: string; navigate
   const healthy = status?.allRelationshipsVerified ?? true;
 
   return (
-    <div>
-      <div className="row between" style={{ marginBottom: 14 }}>
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      <motion.div variants={cardVariants} className="row between" style={{ marginBottom: 14 }}>
         <div className="row gap"><span style={{ fontSize: 22 }}>📊</span><span style={{ fontSize: 20, fontWeight: 800 }}>Agent Dashboard</span></div>
         <button className="btn purple" style={{ fontSize: 11, padding: "6px 12px" }} onClick={() => setShowShareModal(true)}>
           🚀 Viral Share
         </button>
-      </div>
+      </motion.div>
 
       {showShareModal && <ViralShareModal wallet={wallet} onClose={() => setShowShareModal(false)} />}
 
       {/* Agent status */}
-      <div className="card card-elev" style={{ borderColor: healthy ? "rgba(0,230,153,0.5)" : "var(--border)" }}>
+      <motion.div
+        variants={cardVariants}
+        className="card card-elev"
+        style={{ borderColor: healthy ? "rgba(0,230,153,0.5)" : "var(--border)" }}
+      >
         <div className="row between">
           <div className="row gap">
             <span className="status-dot" />
@@ -74,47 +108,67 @@ export function DashboardScreen({ wallet, navigate }: { wallet: string; navigate
         <button className="btn cyan" disabled={running} onClick={runDiag}>
           {running ? <><span className="loader" style={{ width: 16, height: 16 }} /> Checking Base nodes…</> : <>🔄 Re-Run Network Diagnostics</>}
         </button>
-      </div>
+      </motion.div>
 
-      {/* D3 Balance History Chart */}
-      <D3BalanceChart wallet={wallet} />
+      {/* Recharts 30-Day Wallet Balance Visual Trend Line */}
+      <motion.div variants={cardVariants}>
+        <RechartsBalanceTrend wallet={wallet} />
+      </motion.div>
 
       {/* Aerodrome Yield Vaults & ERC-6551 Token Bound Agent Account */}
-      <AgentVaults wallet={wallet} />
+      <motion.div variants={cardVariants}>
+        <AgentVaults wallet={wallet} />
+      </motion.div>
+
+      {/* Quick Actions: Swap & Bridge for Top-Performing Assets + FAB */}
+      <motion.div variants={cardVariants}>
+        <DashboardQuickActions
+          tokens={tokens}
+          wallet={wallet}
+          onNavigateWallet={() => navigate("WALLET")}
+        />
+      </motion.div>
 
       {/* Quick metrics */}
-      <div className="metrics" style={{ marginTop: 14 }}>
+      <motion.div variants={cardVariants} className="metrics" style={{ marginTop: 14 }}>
         <MetricCard icon="📈" tint="var(--neon)" label="AGL Price" value={fmtUsd(oracle?.currentPriceUsd ?? 3.42)} sub={`${(oracle?.change24hPercent ?? 0) >= 0 ? "+" : ""}${(oracle?.change24hPercent ?? 0).toFixed(1)}% 24h`} subColor={oracle?.change24hPercent >= 0 ? "var(--neon)" : "var(--rose)"} />
         <MetricCard icon="🤖" tint="var(--purple)" label="Active Agents" value={fmtNum(stats?.totalActiveAgents ?? 0)} sub="online globally" subColor="var(--text-2)" />
-      </div>
-      <div className="metrics" style={{ marginTop: 12 }}>
+      </motion.div>
+      <motion.div variants={cardVariants} className="metrics" style={{ marginTop: 12 }}>
         <MetricCard icon="✅" tint="var(--cyan)" label="Contract Audits" value={fmtNum(stats?.totalContractAuditsCompleted ?? 0)} sub="completed" subColor="var(--text-2)" />
         <MetricCard icon="⚡" tint="var(--gold)" label="Agent Level" value={`Lv ${profile?.level ?? 24}`} sub={`${(profile?.totalXp ?? 12450).toLocaleString()} XP`} subColor="var(--text-2)" />
-      </div>
+      </motion.div>
 
       {/* Recent activity */}
-      <div className="section-title">Recent Activity</div>
-      <div className="row between" style={{ marginBottom: 10 }}>
-        <span />
-        <span className="small bold" style={{ color: "var(--cyan)", cursor: "pointer" }} onClick={() => navigate("WALLET")}>View Wallet →</span>
-      </div>
-      {txs.slice(0, 5).map((tx) => (
-        <div key={tx.hash} className="list-row">
-          <TokenLogo symbol={tx.tokenSymbol || "AGL"} size={28} />
-          <div className="col" style={{ flex: 1 }}>
-            <div className="bold small">{tx.type.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c: string) => c.toUpperCase())}</div>
-            <div className="tiny muted">{tx.value} {tx.tokenSymbol} · {timeAgo(tx.timestamp)}</div>
-          </div>
-          {statusPill(tx.status)}
+      <motion.div variants={cardVariants} style={{ marginTop: 16 }}>
+        <div className="section-title">Recent Activity</div>
+        <div className="row between" style={{ marginBottom: 10 }}>
+          <span />
+          <span className="small bold" style={{ color: "var(--cyan)", cursor: "pointer" }} onClick={() => navigate("WALLET")}>View Wallet →</span>
         </div>
-      ))}
-    </div>
+        {txs.slice(0, 5).map((tx) => (
+          <div key={tx.hash} className="list-row">
+            <TokenLogo symbol={tx.tokenSymbol || "AGL"} size={28} />
+            <div className="col" style={{ flex: 1 }}>
+              <div className="bold small">{tx.type.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c: string) => c.toUpperCase())}</div>
+              <div className="tiny muted">{tx.value} {tx.tokenSymbol} · {timeAgo(tx.timestamp)}</div>
+            </div>
+            {statusPill(tx.status)}
+          </div>
+        ))}
+      </motion.div>
+    </motion.div>
   );
 }
 
 function MetricCard({ icon, tint, label, value, sub, subColor }: any) {
   return (
-    <div className="card" style={{ padding: 16 }}>
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      transition={{ duration: 0.15 }}
+      className="card"
+      style={{ padding: 16 }}
+    >
       <div className="row gap">
         <div className="avatar-circle" style={{ width: 28, height: 28, background: `${tint}26`, fontSize: 14 }}>{icon}</div>
         <span className="tiny muted">{label}</span>
@@ -122,6 +176,6 @@ function MetricCard({ icon, tint, label, value, sub, subColor }: any) {
       <div style={{ height: 10 }} />
       <div style={{ fontSize: 20, fontWeight: 800 }}>{value}</div>
       <div className="tiny" style={{ color: subColor }}>{sub}</div>
-    </div>
+    </motion.div>
   );
 }
