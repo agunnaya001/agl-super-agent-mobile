@@ -201,7 +201,7 @@ export const AgentVaults: React.FC<AgentVaultsProps> = ({ wallet }) => {
               padding: "6px 10px",
               borderRadius: 8,
               fontSize: 11,
-              fontFamily: "monospace",
+              fontFamily: '"JetBrains Mono", ui-monospace, monospace',
               marginBottom: 12
             }}
           >

@@ -481,7 +481,7 @@ export function Web3LearningModule({ onJumpToAudit }: { onJumpToAudit?: () => vo
             padding: "8px 12px",
             marginBottom: 18,
             fontSize: 11,
-            fontFamily: "ui-monospace, monospace",
+            fontFamily: '"JetBrains Mono", ui-monospace, monospace',
             color: "var(--cyan)",
             wordBreak: "break-all",
           }}

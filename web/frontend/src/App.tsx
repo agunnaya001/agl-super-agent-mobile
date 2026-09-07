@@ -13,6 +13,7 @@ import { StakingCalcScreen } from "./screens/StakingCalc";
 import { ProposalSimScreen } from "./screens/ProposalSim";
 import { DelegationScreen } from "./screens/Delegation";
 import { WatchlistScreen } from "./screens/Watchlist";
+import { AppLogo } from "./components/AppLogo";
 
 const NAV: { screen: Screen; label: string; icon: string }[] = [
   { screen: "HOME", label: "Home", icon: "🏠" },
@@ -46,7 +47,10 @@ export function App() {
   return (
     <div className="app-shell">
       <div className="topbar">
-        <div className="topbar-title">⚡ AGL Super Agent</div>
+        <div className="row gap" style={{ gap: 8, alignItems: "center" }}>
+          <AppLogo size={26} />
+          <span className="topbar-title">AGL Super Agent</span>
+        </div>
         <div className="row gap" style={{ gap: 8 }}>
           <button className="topbar-theme" onClick={toggleTheme} title="Toggle theme">
             {theme === "dark" ? "☀️" : "🌙"}
