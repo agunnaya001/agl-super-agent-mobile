@@ -73,9 +73,14 @@ export function DashboardScreen({ wallet, navigate }: { wallet: string; navigate
     >
       <motion.div variants={cardVariants} className="row between" style={{ marginBottom: 14 }}>
         <div className="row gap"><span style={{ fontSize: 22 }}>📊</span><span style={{ fontSize: 20, fontWeight: 800 }}>Agent Dashboard</span></div>
-        <button className="btn purple" style={{ fontSize: 11, padding: "6px 12px" }} onClick={() => setShowShareModal(true)}>
-          🚀 Viral Share
-        </button>
+        <div className="row gap" style={{ gap: 8 }}>
+          <button className="btn ghost" style={{ fontSize: 11, padding: "6px 12px", width: "auto" }} onClick={() => navigate("WATCHLIST")}>
+            👁️ Watchlist
+          </button>
+          <button className="btn purple" style={{ fontSize: 11, padding: "6px 12px", width: "auto" }} onClick={() => setShowShareModal(true)}>
+            🚀 Viral Share
+          </button>
+        </div>
       </motion.div>
 
       {showShareModal && <ViralShareModal wallet={wallet} onClose={() => setShowShareModal(false)} />}

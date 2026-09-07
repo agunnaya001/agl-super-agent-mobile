@@ -47,4 +47,24 @@ export const api = {
     post<any>("/ai/chat", { message, history }),
   analyzeContract: (address: string) => post<any>("/ai/analyze-contract", { address }),
   auditSecurity: (target: string) => post<any>("/ai/audit-security", { target }),
+
+  // Advanced AI
+  portfolioReport: (address: string, portfolio: any) => post<any>("/ai/portfolio-report", { address, portfolio }),
+  explainTx: (txHash: string, description?: string) => post<any>("/ai/explain-tx", { txHash, description }),
+  contractDiff: (addressA: string, addressB: string) => post<any>("/ai/contract-diff", { addressA, addressB }),
+  gasOptimizer: (address: string) => post<any>("/ai/gas-optimizer", { address }),
+  addressRisk: (address: string) => post<any>("/ai/address-risk", { address }),
+  phishingCheck: (target: string) => post<any>("/ai/phishing-check", { target }),
+
+  // Advanced blockchain
+  getApprovals: (a: string) => get<any>(`/wallet/${a}/approvals`),
+  getWatchlist: () => get<any[]>("/watchlist"),
+  addWatchlist: (label: string, address: string, type?: string, tags?: string[]) =>
+    post<any>("/watchlist", { label, address, type, tags }),
+  removeWatchlist: (id: string) => post<any>(`/watchlist/${id}`, {}),
+  stakingCalculate: (amount: number, aprPercent: number, durationDays: number, compound: boolean) =>
+    post<any>("/staking/calculate", { amount, aprPercent, durationDays, compound }),
+  simulateProposal: (data: any) => post<any>("/governance/simulate", data),
+  getDelegations: () => get<any>("/delegation/explorer"),
+  getDelegation: (address: string) => get<any>(`/delegation/${address}`),
 };

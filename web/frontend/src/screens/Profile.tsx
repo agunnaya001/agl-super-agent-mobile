@@ -58,6 +58,20 @@ export function ProfileScreen({ wallet, navigate }: { wallet: string; navigate: 
         <button className="btn ghost" onClick={() => navigate("DIAGNOSTICS")}>🔧 Diagnostics</button>
         <button className="btn ghost" onClick={() => navigate("PRICE_ALERTS")}>🔔 Price Alerts</button>
       </div>
+
+      <div className="section-title">Advanced Tools</div>
+      <div className="metrics">
+        <button className="btn ghost" onClick={() => navigate("SECURITY")}>🛡️ Security Center</button>
+        <button className="btn ghost" onClick={() => navigate("WATCHLIST")}>👁️ Watchlist</button>
+      </div>
+      <div className="metrics" style={{ marginTop: 8 }}>
+        <button className="btn ghost" onClick={() => navigate("STAKING_CALC")}>💎 Staking Calculator</button>
+        <button className="btn ghost" onClick={() => navigate("PROPOSAL_SIM")}>🎲 Proposal Simulator</button>
+      </div>
+      <div className="metrics" style={{ marginTop: 8 }}>
+        <button className="btn ghost" onClick={() => navigate("DELEGATION")}>🗳️ Delegation Explorer</button>
+        <button className="btn ghost" onClick={() => navigate("GOVERNANCE")}>🏛️ Governance</button>
+      </div>
     </div>
   );
 }

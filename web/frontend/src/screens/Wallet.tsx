@@ -4,6 +4,14 @@ import { Screen } from "../types";
 import { fmtUsd, timeAgo, statusPill, shortAddr } from "../ui";
 import { TokenLogo } from "../components/TokenLogo";
 
+const SAVED_WALLETS_KEY = "agl-saved-wallets";
+interface SavedWallet { address: string; label: string; }
+
+function loadSavedWallets(): SavedWallet[] {
+  try { return JSON.parse(localStorage.getItem(SAVED_WALLETS_KEY) || "[]"); } catch { return []; }
+}
+function saveSavedWallets(w: SavedWallet[]) { localStorage.setItem(SAVED_WALLETS_KEY, JSON.stringify(w)); }
+
 export function WalletScreen({ wallet, setWallet, navigate }: { wallet: string; setWallet: (a: string) => void; navigate: (s: Screen) => void }) {
   const [state, setState] = useState<any>(null);
   const [tokens, setTokens] = useState<any[]>([]);
@@ -12,6 +20,22 @@ export function WalletScreen({ wallet, setWallet, navigate }: { wallet: string; 
   const [loading, setLoading] = useState(true);
   const [addrInput, setAddrInput] = useState("");
   const [selectedTokenIndex, setSelectedTokenIndex] = useState<number | null>(null);
+  const [savedWallets, setSavedWallets] = useState<SavedWallet[]>([]);
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const [walletLabel, setWalletLabel] = useState("");
+
+  useEffect(() => { setSavedWallets(loadSavedWallets()); }, []);
+
+  const saveWallet = () => {
+    const label = walletLabel.trim() || `Wallet ${savedWallets.length + 1}`;
+    const updated = [...savedWallets.filter((w) => w.address !== wallet), { address: wallet, label }];
+    saveSavedWallets(updated); setSavedWallets(updated);
+    setWalletLabel(""); setShowSaveInput(false);
+  };
+  const removeSavedWallet = (addr: string) => {
+    const updated = savedWallets.filter((w) => w.address !== addr);
+    saveSavedWallets(updated); setSavedWallets(updated);
+  };
 
   const load = async (w: string) => {
     setLoading(true);
@@ -47,6 +71,10 @@ export function WalletScreen({ wallet, setWallet, navigate }: { wallet: string; 
       color: colors[i % colors.length]
     };
   });
+
+  const [payAmount, setPayAmount] = useState("");
+  const [showPayUri, setShowPayUri] = useState(false);
+  const payUri = `ethereum:${wallet}@8453?value=${parseFloat(payAmount) || 0}`;
 
   const [swapIn, setSwapIn] = useState("ETH");
   const [swapOut, setSwapOut] = useState("AGL");
@@ -92,6 +120,68 @@ export function WalletScreen({ wallet, setWallet, navigate }: { wallet: string; 
           <button className="btn" style={{ width: "auto", padding: "12px 16px" }} onClick={connect}>Connect</button>
         </div>
         <div className="tiny muted" style={{ marginTop: 8 }}>Zero private keys · read-only monitoring · Base Mainnet</div>
+      </div>
+
+      {/* Multi-wallet manager */}
+      <div className="card">
+        <div className="row between">
+          <div className="bold small">📁 Saved Wallets</div>
+          <button className="tab" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => setShowSaveInput(!showSaveInput)}>
+            {showSaveInput ? "✕ Cancel" : "+ Save Current"}
+          </button>
+        </div>
+        {showSaveInput && (
+          <div style={{ marginTop: 10 }}>
+            <div className="row gap">
+              <input className="input" placeholder="Nickname (e.g. My Treasury)" value={walletLabel} onChange={(e) => setWalletLabel(e.target.value)} />
+              <button className="btn" style={{ width: "auto", padding: "12px 16px" }} onClick={saveWallet}>Save</button>
+            </div>
+          </div>
+        )}
+        {savedWallets.length > 0 ? (
+          <div style={{ marginTop: 8 }}>
+            {savedWallets.map((w) => (
+              <div key={w.address} className="list-row" style={w.address === wallet ? { borderColor: "var(--cyan)" } : {}}>
+                <div className="avatar-circle" style={{ background: "var(--surface)" }}>{w.address === wallet ? "✓" : "👛"}</div>
+                <div className="col" style={{ flex: 1 }}>
+                  <div className="bold small">{w.label}</div>
+                  <div className="tiny muted mono">{shortAddr(w.address)}</div>
+                </div>
+                {w.address === wallet
+                  ? <span className="pill cyan">ACTIVE</span>
+                  : <>
+                      <button className="tab" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => setWallet(w.address)}>Switch</button>
+                      <button className="tab" style={{ fontSize: 11, padding: "4px 10px", color: "var(--rose)" }} onClick={() => removeSavedWallet(w.address)}>✕</button>
+                    </>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="tiny muted" style={{ marginTop: 8 }}>No saved wallets yet. Save the current address for quick switching.</div>
+        )}
+      </div>
+
+      {/* EIP-681 Payment URI */}
+      <div className="card">
+        <div className="bold small" style={{ marginBottom: 8 }}>📨 EIP-681 Payment Request</div>
+        <div className="small muted" style={{ marginBottom: 10 }}>Generate a payment URI for this wallet to share or scan.</div>
+        <div className="row gap">
+          <input className="input" placeholder="Amount in ETH" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+          <button className="btn" style={{ width: "auto", padding: "12px 16px" }} onClick={() => setShowPayUri(!showPayUri)}>Generate</button>
+        </div>
+        {showPayUri && (
+          <div style={{ marginTop: 10 }}>
+            <div className="card" style={{ background: "var(--surface)", padding: 10 }}>
+              <div className="tiny muted" style={{ marginBottom: 4 }}>Payment URI (EIP-681):</div>
+              <div className="mono small" style={{ wordBreak: "break-all", color: "var(--cyan)" }}>{payUri}</div>
+              <div style={{ height: 8 }} />
+              <button className="tab" style={{ fontSize: 11 }} onClick={() => navigator.clipboard.writeText(payUri)}>📋 Copy URI</button>
+            </div>
+            <div style={{ textAlign: "center", marginTop: 10 }}>
+              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(payUri)}`} alt="Payment QR" style={{ borderRadius: 12 }} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Interactive DEX Swap Widget */}

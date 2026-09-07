@@ -6,7 +6,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 const GEMINI_BASE = "https://generativelanguage.googleapis.com";
 
-const AGENT_SYSTEM_PROMPT = `You are the AGL Super Agent, an AI Web3 intelligence command center for Base Mainnet (Chain ID 8453).
+export const AGENT_SYSTEM_PROMPT = `You are the AGL Super Agent, an AI Web3 intelligence command center for Base Mainnet (Chain ID 8453).
 You help users understand transactions, analyze smart contracts, audit security risks, explain DeFi/yield strategies, and guide Web3 learning.
 You operate in a watch-only / zero-private-key security model: never ask for or suggest sharing private keys or seed phrases.
 Be concise, clear, and actionable. Use markdown formatting with short paragraphs and bullet points where helpful.
@@ -15,7 +15,7 @@ When discussing the AGL ecosystem, reference its contracts: AGL Token (ERC-20), 
 interface GeminiContent { role?: string; parts: { text: string }[]; }
 interface GeminiRequest { contents: GeminiContent[]; systemInstruction?: GeminiContent; }
 
-async function callGemini(systemPrompt: string, history: { role: string; text: string }[], userPrompt: string): Promise<string> {
+export async function callGemini(systemPrompt: string, history: { role: string; text: string }[], userPrompt: string): Promise<string> {
   if (!GEMINI_API_KEY || GEMINI_API_KEY === "MY_GEMINI_API_KEY") {
     throw new Error("GEMINI_API_KEY_NOT_CONFIGURED");
   }

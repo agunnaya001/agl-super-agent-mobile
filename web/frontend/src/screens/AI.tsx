@@ -4,22 +4,30 @@ import { Markdown } from "../ui";
 import { Web3LearningModule } from "../components/Web3LearningModule";
 
 type Msg = { role: "user" | "agent"; text: string };
-type TabType = "CHAT" | "LEARN" | "ANALYZER" | "AUDIT";
+type TabType = "CHAT" | "LEARN" | "ANALYZER" | "AUDIT" | "PORTFOLIO" | "EXPLAIN" | "DIFF" | "GAS";
 
-export function AIScreen() {
+export function AIScreen({ wallet }: { wallet: string }) {
   const [tab, setTab] = useState<TabType>("CHAT");
   return (
     <div>
       <div className="tabs">
         <button className={`tab ${tab === "CHAT" ? "active" : ""}`} onClick={() => setTab("CHAT")}>💬 Chat</button>
-        <button className={`tab ${tab === "LEARN" ? "active" : ""}`} onClick={() => setTab("LEARN")}>🎓 Web3 Learning</button>
-        <button className={`tab ${tab === "ANALYZER" ? "active" : ""}`} onClick={() => setTab("ANALYZER")}>📜 Contract Analyzer</button>
+        <button className={`tab ${tab === "LEARN" ? "active" : ""}`} onClick={() => setTab("LEARN")}>🎓 Learning</button>
+        <button className={`tab ${tab === "ANALYZER" ? "active" : ""}`} onClick={() => setTab("ANALYZER")}>📜 Analyzer</button>
         <button className={`tab ${tab === "AUDIT" ? "active" : ""}`} onClick={() => setTab("AUDIT")}>🛡️ Audit</button>
+        <button className={`tab ${tab === "PORTFOLIO" ? "active" : ""}`} onClick={() => setTab("PORTFOLIO")}>📊 Portfolio</button>
+        <button className={`tab ${tab === "EXPLAIN" ? "active" : ""}`} onClick={() => setTab("EXPLAIN")}>📝 Tx Explainer</button>
+        <button className={`tab ${tab === "DIFF" ? "active" : ""}`} onClick={() => setTab("DIFF")}>🔄 Diff</button>
+        <button className={`tab ${tab === "GAS" ? "active" : ""}`} onClick={() => setTab("GAS")}>⛽ Gas</button>
       </div>
       {tab === "CHAT" && <ChatTab onOpenLearn={() => setTab("LEARN")} />}
       {tab === "LEARN" && <Web3LearningModule onJumpToAudit={() => setTab("AUDIT")} />}
       {tab === "ANALYZER" && <AnalyzerTab />}
       {tab === "AUDIT" && <AuditTab />}
+      {tab === "PORTFOLIO" && <PortfolioTab wallet={wallet} />}
+      {tab === "EXPLAIN" && <ExplainTxTab />}
+      {tab === "DIFF" && <DiffTab />}
+      {tab === "GAS" && <GasTab />}
     </div>
   );
 }
@@ -222,10 +230,159 @@ function AuditTab() {
             >
               Copy Report
             </button>
+            <button
+              className="tab"
+              style={{ fontSize: 11, padding: "2px 8px" }}
+              onClick={() => {
+                const shareUrl = `${window.location.origin}/#audit=${encodeURIComponent(target)}`;
+                if (navigator.share) {
+                  navigator.share({ title: "AGL Security Audit", text: result, url: shareUrl }).catch(() => {});
+                } else {
+                  navigator.clipboard.writeText(`${result}\n\n${shareUrl}`);
+                }
+              }}
+            >
+              🔗 Share
+            </button>
           </div>
           <Markdown text={result} />
         </div>
       )}
+    </div>
+  );
+}
+
+function PortfolioTab({ wallet }: { wallet: string }) {
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [portfolio, setPortfolio] = useState<any>(null);
+
+  const run = async () => {
+    setLoading(true); setResult("");
+    const p = await api.getPortfolio(wallet).catch(() => null);
+    setPortfolio(p);
+    try {
+      const r = await api.portfolioReport(wallet, p);
+      setResult(r.reply || r.error || "No result.");
+    } catch (e) { setResult(`⚠️ ${(e as Error).message}`); }
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      <div className="card">
+        <div className="bold small" style={{ marginBottom: 8 }}>📊 AI Portfolio Health Report</div>
+        <div className="small muted" style={{ marginBottom: 10 }}>
+          Generates a health report for your connected wallet: concentration risk, stale positions, gas spending, and rebalance suggestions.
+        </div>
+        <button className="btn" disabled={loading} onClick={run}>
+          {loading ? <><span className="loader" style={{ width: 16, height: 16 }} /> Analyzing portfolio…</> : "📊 Generate Health Report"}
+        </button>
+      </div>
+      {portfolio && !result && (
+        <div className="card">
+          <div className="small muted">Portfolio loaded — generating report…</div>
+        </div>
+      )}
+      {result && <div className="card"><Markdown text={result} /></div>}
+    </div>
+  );
+}
+
+function ExplainTxTab() {
+  const [input, setInput] = useState("");
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+  const run = async () => {
+    if (!input.trim()) return;
+    setLoading(true); setResult("");
+    try {
+      const r = await api.explainTx(input.trim());
+      setResult(r.reply || r.error || "No result.");
+    } catch (e) { setResult(`⚠️ ${(e as Error).message}`); }
+    setLoading(false);
+  };
+  return (
+    <div>
+      <div className="card">
+        <div className="bold small" style={{ marginBottom: 8 }}>📝 Transaction Batch Explainer</div>
+        <div className="small muted" style={{ marginBottom: 10 }}>
+          Paste a transaction hash or describe a multi-call interaction. The AI breaks down every call, token flow, and dollar value.
+        </div>
+        <textarea className="input" placeholder="0x… tx hash or paste calldata / describe the transaction" value={input} onChange={(e) => setInput(e.target.value)} />
+        <div style={{ height: 10 }} />
+        <button className="btn" disabled={loading || !input.trim()} onClick={run}>
+          {loading ? <><span className="loader" style={{ width: 16, height: 16 }} /> Explaining…</> : "📝 Explain Transaction"}
+        </button>
+      </div>
+      {result && <div className="card"><Markdown text={result} /></div>}
+    </div>
+  );
+}
+
+function DiffTab() {
+  const [addrA, setAddrA] = useState("");
+  const [addrB, setAddrB] = useState("");
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+  const run = async () => {
+    if (!addrA.trim() || !addrB.trim()) return;
+    setLoading(true); setResult("");
+    try {
+      const r = await api.contractDiff(addrA.trim(), addrB.trim());
+      setResult(r.reply || r.error || "No result.");
+    } catch (e) { setResult(`⚠️ ${(e as Error).message}`); }
+    setLoading(false);
+  };
+  return (
+    <div>
+      <div className="card">
+        <div className="bold small" style={{ marginBottom: 8 }}>🔄 Smart-Contract Diff Auditor</div>
+        <div className="small muted" style={{ marginBottom: 10 }}>
+          Compare two Base Mainnet contracts. The AI highlights what changed and any new risk surface.
+        </div>
+        <div className="small muted" style={{ marginBottom: 4 }}>Contract A</div>
+        <input className="input" placeholder="0x…" value={addrA} onChange={(e) => setAddrA(e.target.value)} />
+        <div style={{ height: 8 }} />
+        <div className="small muted" style={{ marginBottom: 4 }}>Contract B</div>
+        <input className="input" placeholder="0x…" value={addrB} onChange={(e) => setAddrB(e.target.value)} />
+        <div style={{ height: 10 }} />
+        <button className="btn" disabled={loading || !addrA.trim() || !addrB.trim()} onClick={run}>
+          {loading ? <><span className="loader" style={{ width: 16, height: 16 }} /> Diffing…</> : "🔄 Audit Diff"}
+        </button>
+      </div>
+      {result && <div className="card"><Markdown text={result} /></div>}
+    </div>
+  );
+}
+
+function GasTab() {
+  const [addr, setAddr] = useState("");
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+  const run = async () => {
+    if (!addr.trim()) return;
+    setLoading(true); setResult("");
+    try {
+      const r = await api.gasOptimizer(addr.trim());
+      setResult(r.reply || r.error || "No result.");
+    } catch (e) { setResult(`⚠️ ${(e as Error).message}`); }
+    setLoading(false);
+  };
+  return (
+    <div>
+      <div className="card">
+        <div className="bold small" style={{ marginBottom: 8 }}>⛽ Gas-Optimization Coach</div>
+        <div className="small muted" style={{ marginBottom: 10 }}>
+          Feed a contract address and get AI-suggested gas-saving patterns with estimated savings.
+        </div>
+        <input className="input" placeholder="0x… contract address" value={addr} onChange={(e) => setAddr(e.target.value)} />
+        <div style={{ height: 10 }} />
+        <button className="btn" disabled={loading || !addr.trim()} onClick={run}>
+          {loading ? <><span className="loader" style={{ width: 16, height: 16 }} /> Analyzing gas…</> : "⛽ Optimize Gas"}
+        </button>
+      </div>
+      {result && <div className="card"><Markdown text={result} /></div>}
     </div>
   );
 }

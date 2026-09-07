@@ -9,7 +9,7 @@ function useAsync<T>(fn: () => Promise<T>, deps: any[]) {
   return { data, loading };
 }
 
-export function StakingScreen() {
+export function StakingScreen({ navigate }: { navigate?: (s: any) => void }) {
   const { data, loading } = useAsync(() => api.getStaking(), []);
   if (loading) return <div className="center"><div className="loader" /></div>;
   return (
@@ -32,11 +32,16 @@ export function StakingScreen() {
       <div className="card" style={{ marginTop: 12 }}>
         <div className="small muted">Read-only monitoring. Staking actions require a connected wallet signer.</div>
       </div>
+      {navigate && (
+        <button className="btn ghost" style={{ marginTop: 12 }} onClick={() => navigate("STAKING_CALC")}>
+          💎 Open Staking Calculator
+        </button>
+      )}
     </div>
   );
 }
 
-export function GovernanceScreen() {
+export function GovernanceScreen({ navigate }: { navigate?: (s: any) => void }) {
   const { data, loading } = useAsync(() => api.getGovernance(), []);
   if (loading) return <div className="center"><div className="loader" /></div>;
   const d = data?.details;
@@ -64,9 +69,29 @@ export function GovernanceScreen() {
             <span className="pill rose">❌ {p.againstVotes}</span>
             <span className="pill purple"> abstain {p.abstainVotes}</span>
           </div>
+          {(() => {
+            const totalCast = parseFloat((p.forVotes || "0").replace(/,/g, "")) + parseFloat((p.againstVotes || "0").replace(/,/g, "")) + parseFloat((p.abstainVotes || "0").replace(/,/g, ""));
+            const quorum = 40000;
+            const pct = Math.min(100, (totalCast / quorum) * 100);
+            return (
+              <div style={{ marginTop: 8 }}>
+                <div className="row between tiny muted" style={{ marginBottom: 4 }}>
+                  <span>Quorum Progress</span>
+                  <span>{pct.toFixed(0)}% ({totalCast.toLocaleString()} / {quorum.toLocaleString()})</span>
+                </div>
+                <div className="progress-track"><div className="progress-fill" style={{ width: `${pct}%`, background: pct >= 100 ? "linear-gradient(90deg, var(--neon), var(--cyan))" : undefined }} /></div>
+              </div>
+            );
+          })()}
           <div className="tiny muted" style={{ marginTop: 6 }}>End block #{Number(p.endBlock).toLocaleString()} · {p.calldatasSummary}</div>
         </div>
       ))}
+      {navigate && (
+        <div className="metrics" style={{ marginTop: 12 }}>
+          <button className="btn ghost" onClick={() => navigate("PROPOSAL_SIM")}>🎲 Vote Simulator</button>
+          <button className="btn ghost" onClick={() => navigate("DELEGATION")}>🗳️ Delegation Explorer</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -128,29 +153,131 @@ export function PriceAlertsScreen() {
   const [oracle, setOracle] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [price, setPrice] = useState("");
-  useEffect(() => { api.getOracle().then((o) => { setOracle(o); setLoading(false); }).catch(() => setLoading(false)); }, []);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [notifyEnabled, setNotifyEnabled] = useState(false);
+  const [lastPrice, setLastPrice] = useState<number | null>(null);
+  const [alerts, setAlerts] = useState([
+    { id: 1, label: "AGL > $3.80", desc: "Resistance Breakout Target", threshold: 3.80, direction: "above", active: true, triggered: false },
+    { id: 2, label: "AGL < $3.20", desc: "DCA Dip Accumulation Zone", threshold: 3.20, direction: "below", active: true, triggered: false },
+  ]);
+  const [newThreshold, setNewThreshold] = useState("");
+  const [newDirection, setNewDirection] = useState("above");
+
+  const fetchOracle = async () => {
+    const o = await api.getOracle().catch(() => null);
+    if (o) {
+      setLastPrice(oracle?.currentPriceUsd ?? null);
+      setOracle(o);
+      // Check alerts
+      const p = o.currentPriceUsd;
+      setAlerts((prev) => prev.map((a) => {
+        if (!a.active || a.triggered) return a;
+        const hit = a.direction === "above" ? p >= a.threshold : p <= a.threshold;
+        if (hit) {
+          if (notifyEnabled && "Notification" in window && Notification.permission === "granted") {
+            new Notification("🔔 AGL Price Alert", { body: `${a.label} — current price: $${p.toFixed(2)}` });
+          }
+          return { ...a, triggered: true };
+        }
+        return a;
+      }));
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchOracle(); }, []);
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(fetchOracle, 15000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, notifyEnabled]);
+
   const simulate = async () => { const p = parseFloat(price); const r = await api.simulateOracle(isNaN(p) ? null : p); setOracle(r); };
+
+  const enableNotifications = async () => {
+    if (!("Notification" in window)) return;
+    const perm = await Notification.requestPermission();
+    setNotifyEnabled(perm === "granted");
+  };
+
+  const addAlert = () => {
+    const t = parseFloat(newThreshold);
+    if (isNaN(t)) return;
+    setAlerts((prev) => [...prev, {
+      id: Date.now(), label: `AGL ${newDirection === "above" ? ">" : "<"} $${t}`, desc: "Custom alert",
+      threshold: t, direction: newDirection, active: true, triggered: false,
+    }]);
+    setNewThreshold("");
+  };
+
+  const toggleAlert = (id: number) => setAlerts((prev) => prev.map((a) => a.id === id ? { ...a, active: !a.active, triggered: false } : a));
+  const removeAlert = (id: number) => setAlerts((prev) => prev.filter((a) => a.id !== id));
+
   if (loading) return <div className="center"><div className="loader" /></div>;
   return (
     <div>
       <div className="section-title" style={{ marginTop: 0 }}>🔔 Price Alerts</div>
       <div className="card card-elev">
-        <div className="small muted">AGL Oracle Price</div>
+        <div className="row between">
+          <div className="small muted">AGL Oracle Price</div>
+          <button className="tab" style={{ fontSize: 11, padding: "3px 8px" }} onClick={() => setAutoRefresh(!autoRefresh)}>
+            {autoRefresh ? "⏸️ Auto-refresh ON" : "▶️ Auto-refresh"}
+          </button>
+        </div>
         <div style={{ fontSize: 30, fontWeight: 800 }}>{fmtUsd(oracle?.currentPriceUsd ?? 3.42)}</div>
         <div className="tiny" style={{ color: "var(--cyan)" }}>{oracle?.oracleProvider}</div>
+        {lastPrice != null && (
+          <div className="tiny" style={{ color: (oracle?.currentPriceUsd ?? 0) > lastPrice ? "var(--neon)" : "var(--rose)", marginTop: 4 }}>
+            {(oracle?.currentPriceUsd ?? 0) > lastPrice ? "▲" : "▼"} {Math.abs((oracle?.currentPriceUsd ?? 0) - lastPrice).toFixed(4)} from last check
+          </div>
+        )}
         <div style={{ height: 8 }} />
         <div className="row between"><span className="tiny muted">24h Change</span><span className="bold" style={{ color: (oracle?.change24hPercent ?? 0) >= 0 ? "var(--neon)" : "var(--rose)" }}>{(oracle?.change24hPercent ?? 0) >= 0 ? "+" : ""}{(oracle?.change24hPercent ?? 0).toFixed(1)}%</span></div>
         <div className="row between"><span className="tiny muted">24h High / Low</span><span className="small">{fmtUsd(oracle?.high24hUsd)} / {fmtUsd(oracle?.low24hUsd)}</span></div>
       </div>
+
+      <div className="card">
+        <div className="bold small" style={{ marginBottom: 8 }}>🔔 Browser Notifications</div>
+        {notifyEnabled ? (
+          <div className="small" style={{ color: "var(--neon)" }}>✅ Notifications enabled — you'll be alerted when price thresholds are hit.</div>
+        ) : (
+          <button className="btn ghost" onClick={enableNotifications}>Enable Browser Notifications</button>
+        )}
+      </div>
+
       <div className="card">
         <div className="bold small">Simulate Oracle Price</div>
         <div style={{ height: 8 }} />
         <div className="row gap"><input className="input" placeholder="3.50" value={price} onChange={(e) => setPrice(e.target.value)} /><button className="btn" style={{ width: "auto", padding: "12px 16px" }} onClick={simulate}>Set</button></div>
       </div>
+
       <div className="card">
-        <div className="bold small">Active Alerts</div>
-        <div className="list-row" style={{ marginTop: 8 }}><div className="col" style={{ flex: 1 }}><div className="bold small">AGL {'>'} $3.80</div><div className="tiny muted">Resistance Breakout Target</div></div><span className="pill green">ABOVE</span></div>
-        <div className="list-row"><div className="col" style={{ flex: 1 }}><div className="bold small">AGL {'<'} $3.20</div><div className="tiny muted">DCA Dip Accumulation Zone</div></div><span className="pill rose">BELOW</span></div>
+        <div className="bold small" style={{ marginBottom: 8 }}>➕ Add Custom Alert</div>
+        <div className="row gap">
+          <select className="input" style={{ width: "auto" }} value={newDirection} onChange={(e) => setNewDirection(e.target.value)}>
+            <option value="above">Above</option>
+            <option value="below">Below</option>
+          </select>
+          <input className="input" type="number" placeholder="3.50" value={newThreshold} onChange={(e) => setNewThreshold(e.target.value)} />
+          <button className="btn" style={{ width: "auto", padding: "12px 16px" }} onClick={addAlert}>Add</button>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="bold small" style={{ marginBottom: 8 }}>Active Alerts</div>
+        {alerts.map((a) => (
+          <div key={a.id} className="list-row" style={{ opacity: a.active ? 1 : 0.5 }}>
+            <div className="avatar-circle" style={{ background: a.triggered ? "rgba(0,230,153,0.15)" : "var(--surface)" }}>
+              {a.triggered ? "🔔" : a.direction === "above" ? "📈" : "📉"}
+            </div>
+            <div className="col" style={{ flex: 1 }}>
+              <div className="bold small">{a.label}</div>
+              <div className="tiny muted">{a.desc}{a.triggered ? " · TRIGGERED" : ""}</div>
+            </div>
+            <button className="tab" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => toggleAlert(a.id)}>{a.active ? "ON" : "OFF"}</button>
+            <button className="tab" style={{ fontSize: 10, padding: "2px 6px", color: "var(--rose)" }} onClick={() => removeAlert(a.id)}>✕</button>
+          </div>
+        ))}
       </div>
     </div>
   );
