@@ -37,12 +37,25 @@ function ChatTab({ onOpenLearn }: { onOpenLearn?: () => void }) {
   const [messages, setMessages] = useState<Msg[]>([
     { role: "agent", text: "Welcome to **AGL Super Agent**! I'm your AI Web3 intelligence command center on Base. Ask me to explain transactions, analyze smart contracts, audit security risks, or guide your Web3 learning." },
   ]);
+  const [sessionKey] = useState(() => {
+    const storageKey = "agl-chat-session";
+    const existing = sessionStorage.getItem(storageKey);
+    if (existing) return existing;
+    const created = `web-${crypto.randomUUID()}`;
+    sessionStorage.setItem(storageKey, created);
+    return created;
+  });
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
   const [followUps, setFollowUps] = useState<string[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { api.getFollowUps().then(setFollowUps).catch(() => {}); }, []);
+  useEffect(() => {
+    api.getFollowUps().then(setFollowUps).catch(() => {});
+    api.getChatHistory(sessionKey).then(({ messages: saved }) => {
+      if (saved.length) setMessages(saved.map((item) => ({ role: item.role === "user" ? "user" : "agent", text: item.message })));
+    }).catch(() => {});
+  }, [sessionKey]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, thinking]);
 
   const send = async (text: string) => {
@@ -51,7 +64,7 @@ function ChatTab({ onOpenLearn }: { onOpenLearn?: () => void }) {
     setMessages((m) => [...m, { role: "user", text }, { role: "agent", text: "" }]);
     setInput(""); setThinking(true);
     try {
-      const r = await api.aiChat(text, history);
+      const r = await api.aiChat(text, history, sessionKey);
       setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "agent", text: r.reply || r.error || "No response." }; return c; });
     } catch (e) {
       setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "agent", text: `⚠️ Request failed: ${(e as Error).message}` }; return c; });

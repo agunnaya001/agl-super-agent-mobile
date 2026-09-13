@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { getConversationHistory, saveConversationMessage } from "../db.js";
 
 export const aiRouter = Router();
 
@@ -52,11 +53,29 @@ async function callGemini(systemPrompt: string, history: { role: string; text: s
   return reply || "No response received from the AI Super Agent.";
 }
 
-aiRouter.post("/chat", async (req, res) => {
-  const { message, history } = req.body as { message?: string; history?: { role: string; text: string }[] };
-  if (!message || !message.trim()) { res.status(400).json({ error: "Message required" }); return; }
+aiRouter.get("/chat/history", async (req, res) => {
+  const sessionKey = String(req.query.sessionKey || "").trim();
+  if (!sessionKey || sessionKey.length > 128) { res.status(400).json({ error: "Valid session key required" }); return; }
   try {
-    const reply = await callGemini(AGENT_SYSTEM_PROMPT, history ?? [], message);
+    res.json({ messages: await getConversationHistory(sessionKey) });
+  } catch (error) {
+    console.error("[v0] Failed to load chat history:", error);
+    res.status(503).json({ error: "Conversation history unavailable" });
+  }
+});
+
+aiRouter.post("/chat", async (req, res) => {
+  const { message, history, sessionKey } = req.body as { message?: string; history?: { role: string; text: string }[]; sessionKey?: string };
+  const cleanMessage = message?.trim();
+  const cleanSessionKey = sessionKey?.trim();
+  if (!cleanMessage) { res.status(400).json({ error: "Message required" }); return; }
+  if (!cleanSessionKey || cleanSessionKey.length > 128) { res.status(400).json({ error: "Valid session key required" }); return; }
+  try {
+    const reply = await callGemini(AGENT_SYSTEM_PROMPT, history ?? [], cleanMessage);
+    await Promise.all([
+      saveConversationMessage(cleanSessionKey, "user", cleanMessage),
+      saveConversationMessage(cleanSessionKey, "assistant", reply),
+    ]).catch((error) => console.error("[v0] Failed to persist chat message:", error));
     res.json({ reply, sender: "AGENT" });
   } catch (e) {
     const msg = (e as Error).message;

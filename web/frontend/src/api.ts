@@ -43,8 +43,9 @@ export const api = {
   getAiSuggestions: () => get<any[]>("/ai-suggestions"),
   getFollowUps: () => get<string[]>("/follow-ups"),
 
-  aiChat: (message: string, history: { role: string; text: string }[]) =>
-    post<any>("/ai/chat", { message, history }),
+  getChatHistory: (sessionKey: string) => get<{ messages: { role: string; message: string; created_at: string }[] }>(`/ai/chat/history?sessionKey=${encodeURIComponent(sessionKey)}`),
+  aiChat: (message: string, history: { role: string; text: string }[], sessionKey: string) =>
+    post<any>("/ai/chat", { message, history, sessionKey }),
   analyzeContract: (address: string) => post<any>("/ai/analyze-contract", { address }),
   auditSecurity: (target: string) => post<any>("/ai/audit-security", { target }),
 };
