@@ -3,6 +3,25 @@ import { getConversationHistory, saveConversationMessage } from "../db.js";
 
 export const aiRouter = Router();
 
+const requestWindows = new Map<string, { startedAt: number; count: number }>();
+const WINDOW_MS = 60_000;
+const MAX_REQUESTS = 20;
+const evmAddress = /^0x[a-fA-F0-9]{40}$/;
+
+aiRouter.use((req, res, next) => {
+  const key = req.ip || "unknown";
+  const now = Date.now();
+  const current = requestWindows.get(key);
+  const window = !current || now - current.startedAt >= WINDOW_MS ? { startedAt: now, count: 0 } : current;
+  window.count += 1;
+  requestWindows.set(key, window);
+  if (window.count > MAX_REQUESTS) {
+    res.status(429).json({ error: "Too many AI requests. Try again shortly." });
+    return;
+  }
+  next();
+});
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 const GEMINI_BASE = "https://generativelanguage.googleapis.com";
@@ -89,7 +108,7 @@ aiRouter.post("/chat", async (req, res) => {
 
 aiRouter.post("/analyze-contract", async (req, res) => {
   const { address } = req.body as { address?: string };
-  if (!address || !address.trim()) { res.status(400).json({ error: "Contract address required" }); return; }
+  if (!address || !evmAddress.test(address.trim())) { res.status(400).json({ error: "Valid EVM contract address required" }); return; }
   const prompt = `Analyze the Base Mainnet smart contract at address ${address}.
 Provide a structured analysis covering:
 1. **Overview** — likely contract type and purpose
@@ -108,7 +127,7 @@ Be concise. If this is an AGL ecosystem contract, note that.`;
 
 aiRouter.post("/audit-security", async (req, res) => {
   const { target } = req.body as { target?: string };
-  if (!target || !target.trim()) { res.status(400).json({ error: "Target required" }); return; }
+  if (!target || !evmAddress.test(target.trim())) { res.status(400).json({ error: "Valid EVM contract address required" }); return; }
   const trimmed = target.trim();
   const prompt = `Perform a smart contract security vulnerability audit on "${trimmed}" on Base Mainnet (Chain ID 8453, OP Stack Layer 2).
 Summarize potential security vulnerabilities with clear markdown:
