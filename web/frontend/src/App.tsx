@@ -9,13 +9,13 @@ import { QuestsScreen } from "./screens/Quests";
 import { ProfileScreen } from "./screens/Profile";
 import { StakingScreen, GovernanceScreen, TimelockScreen, DiagnosticsScreen, PriceAlertsScreen, AglTokenScreen, CreditsScreen, WaglScreen } from "./screens/Secondary";
 
-const NAV: { screen: Screen; label: string; icon: string }[] = [
-  { screen: "HOME", label: "Home", icon: "🏠" },
-  { screen: "DASHBOARD", label: "Monitor", icon: "📊" },
-  { screen: "WALLET", label: "Wallet", icon: "👛" },
-  { screen: "AI", label: "AI Agent", icon: "🤖" },
-  { screen: "QUESTS", label: "Quests", icon: "🏆" },
-  { screen: "PROFILE", label: "Profile", icon: "👤" },
+const NAV: { screen: Screen; label: string; icon: string; hint: string }[] = [
+  { screen: "HOME", label: "Home", icon: "⌂", hint: "Overview" },
+  { screen: "DASHBOARD", label: "Monitor", icon: "◈", hint: "Network health" },
+  { screen: "WALLET", label: "Wallet", icon: "◇", hint: "Assets and activity" },
+  { screen: "AI", label: "AI Agent", icon: "✦", hint: "Ask your agent" },
+  { screen: "QUESTS", label: "Quests", icon: "◆", hint: "Earn XP" },
+  { screen: "PROFILE", label: "Profile", icon: "○", hint: "Account" },
 ];
 
 export function App() {
@@ -25,15 +25,22 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <div className="topbar">
-        <div className="topbar-title">⚡ AGL Super Agent</div>
-        <button className="topbar-wallet" onClick={() => setScreen("WALLET")}>
-          <span className="status-dot" />
-          {shortAddr(wallet)}
+      <header className="topbar">
+        <div className="brand-lockup">
+          <span className="brand-mark" aria-hidden="true">A</span>
+          <div>
+            <div className="topbar-title">AGL Super Agent</div>
+            <div className="topbar-subtitle">Base intelligence layer</div>
+          </div>
+        </div>
+        <button className="topbar-wallet" onClick={() => setScreen("WALLET")} aria-label={`Open wallet ${shortAddr(wallet)}`}>
+          <span className="status-dot" aria-hidden="true" />
+          <span>{shortAddr(wallet)}</span>
+          <span className="wallet-chevron" aria-hidden="true">↗</span>
         </button>
-      </div>
+      </header>
 
-      <div className="app-content">
+      <main className="app-content">
         {screen === "HOME" && <HomeScreen wallet={wallet} navigate={navigate} />}
         {screen === "DASHBOARD" && <DashboardScreen wallet={wallet} navigate={navigate} />}
         {screen === "WALLET" && <WalletScreen wallet={wallet} setWallet={setWallet} navigate={navigate} />}
@@ -48,13 +55,14 @@ export function App() {
         {screen === "AGL_TOKEN" && <AglTokenScreen />}
         {screen === "CREDITS" && <CreditsScreen wallet={wallet} />}
         {screen === "WAGL" && <WaglScreen wallet={wallet} />}
-      </div>
+      </main>
 
-      <nav className="bottomnav">
+      <nav className="bottomnav" aria-label="Primary navigation">
         {NAV.map((n) => (
-          <button key={n.screen} className={`nav-item ${screen === n.screen ? "active" : ""}`} onClick={() => navigate(n.screen)}>
-            <span className="nav-icon">{n.icon}</span>
+          <button key={n.screen} className={`nav-item ${screen === n.screen ? "active" : ""}`} onClick={() => navigate(n.screen)} aria-current={screen === n.screen ? "page" : undefined}>
+            <span className="nav-icon" aria-hidden="true">{n.icon}</span>
             <span>{n.label}</span>
+            <span className="sr-only">{n.hint}</span>
           </button>
         ))}
       </nav>

@@ -10,7 +10,16 @@ export function AIScreen() {
   const [tab, setTab] = useState<TabType>("CHAT");
   return (
     <div>
-      <div className="tabs">
+      <section className="page-intro agent-intro">
+        <div>
+          <div className="eyebrow">AGL INTELLIGENCE</div>
+          <h1>Ask your agent.</h1>
+          <p className="muted">Research, learn, analyze contracts, and audit risk from one workspace.</p>
+        </div>
+        <span className="pill cyan">Base · 8453</span>
+      </section>
+      <div className="tabs" role="tablist" aria-label="Agent workspace">
+
         <button className={`tab ${tab === "CHAT" ? "active" : ""}`} onClick={() => setTab("CHAT")}>💬 Chat</button>
         <button className={`tab ${tab === "LEARN" ? "active" : ""}`} onClick={() => setTab("LEARN")}>🎓 Web3 Learning</button>
         <button className={`tab ${tab === "ANALYZER" ? "active" : ""}`} onClick={() => setTab("ANALYZER")}>📜 Contract Analyzer</button>
@@ -100,8 +109,8 @@ function ChatTab({ onOpenLearn }: { onOpenLearn?: () => void }) {
       )}
 
       <div className="row gap">
-        <input className="input" placeholder="Ask the AI agent…" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send(input)} />
-        <button className="btn" style={{ width: "auto", padding: "12px 18px" }} disabled={thinking} onClick={() => send(input)}>Send</button>
+        <input aria-label="Message the AI agent" className="input" placeholder="Ask about your wallet, Base, or a contract…" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) send(input); }} />
+        <button className="btn" style={{ width: "auto", padding: "12px 18px" }} disabled={thinking || !input.trim()} onClick={() => send(input)}>{thinking ? "Thinking…" : "Send"}</button>
       </div>
     </div>
   );

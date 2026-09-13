@@ -33,6 +33,14 @@ export function HomeScreen({ wallet, navigate }: { wallet: string; navigate: (s:
 
   return (
     <div>
+      <section className="page-intro">
+        <div>
+          <div className="eyebrow">PERSONAL COMMAND CENTER</div>
+          <h1>Good to see you, operator.</h1>
+          <p className="muted">Your agent is watching Base Mainnet and keeping your portfolio in context.</p>
+        </div>
+        <span className="pill green"><span className="status-dot" aria-hidden="true" /> Agent online</span>
+      </section>
       {showWalkthrough && (
         <WalkthroughModal
           onClose={() => setShowWalkthrough(false)}
