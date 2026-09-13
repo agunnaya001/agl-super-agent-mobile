@@ -1,0 +1,14 @@
+{
+  "name": "agl-super-agent-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "web/frontend",
+    "web/backend"
+  ],
+  "scripts": {
+    "dev": "npm --workspace web/frontend run dev",
+    "build": "npm --workspace web/frontend run build",
+    "preview": "npm --workspace web/frontend run preview"
+  }
+}
