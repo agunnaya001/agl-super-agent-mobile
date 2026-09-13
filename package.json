@@ -7,7 +7,7 @@
     "web/backend"
   ],
   "scripts": {
-    "dev": "npm --workspace web/frontend run dev",
+    "dev": "npm --workspace web/frontend run dev -- --port 3000",
     "build": "npm --workspace web/frontend run build",
     "preview": "npm --workspace web/frontend run preview"
   }
