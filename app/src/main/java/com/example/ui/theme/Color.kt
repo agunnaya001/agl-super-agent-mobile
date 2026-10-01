@@ -36,4 +36,5 @@ val RiskReviewBg = Color(0xFF382705)
 val RiskReviewBorder = Color(0xFFFFB020)
 val RiskHighBg = Color(0xFF3B0D0D)
 val RiskHighBorder = Color(0xFFFF453A)
+val RiskHighText = Color(0xFFFF453A)
 

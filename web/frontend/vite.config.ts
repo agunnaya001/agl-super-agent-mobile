@@ -6,6 +6,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      "/dao": path.resolve(__dirname, "src/dao"),
+      "dao": path.resolve(__dirname, "src/dao"),
       "/dao/lib": path.resolve(__dirname, "src/dao/lib"),
       "dao/lib": path.resolve(__dirname, "src/dao/lib"),
     },

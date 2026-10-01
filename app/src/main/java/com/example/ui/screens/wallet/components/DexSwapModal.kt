@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
@@ -59,6 +60,7 @@ import com.example.data.remote.blockchain.config.BaseBlockchainConfig
 import com.example.data.remote.blockchain.services.DexAggregatorService
 import com.example.data.remote.blockchain.services.DexQuote
 import com.example.data.remote.blockchain.services.SwapToken
+import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.BaseBlue
 import com.example.ui.theme.BaseCyan
 import com.example.ui.theme.DarkBackground
@@ -520,7 +522,7 @@ fun DexSwapModal(
                     }
 
                     val swapAmtNum = amountInText.toDoubleOrNull() ?: 0.0
-                    val swapEstUsd = swapAmtNum * tokenIn.priceUsd
+                    val swapEstUsd = swapAmtNum * tokenIn.basePriceUsd
                     val isSwapHighValue = swapEstUsd >= 100.0 || (swapAmtNum >= 0.05 && tokenIn.symbol == "ETH") || (swapAmtNum >= 100.0 && tokenIn.symbol == "AGL")
 
                     if (isSwapHighValue && swapAmtNum > 0) {
@@ -579,7 +581,7 @@ fun DexSwapModal(
         // Biometric Security Guard Overlay before broadcasting on Base
         if (showBiometricAuthOverlay && currentQuote != null) {
             val swapAmtNum = amountInText.toDoubleOrNull() ?: 0.0
-            val swapEstUsd = swapAmtNum * tokenIn.priceUsd
+            val swapEstUsd = swapAmtNum * tokenIn.basePriceUsd
             val isSwapHighValue = swapEstUsd >= 100.0 || (swapAmtNum >= 0.05 && tokenIn.symbol == "ETH") || (swapAmtNum >= 100.0 && tokenIn.symbol == "AGL")
             TransactionBiometricAuthOverlay(
                 details = TransactionBiometricDetails(

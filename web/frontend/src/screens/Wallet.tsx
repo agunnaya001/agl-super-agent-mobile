@@ -3,6 +3,7 @@ import { api } from "../api";
 import { Screen } from "../types";
 import { fmtUsd, timeAgo, statusPill, shortAddr } from "../ui";
 import { TokenLogo } from "../components/TokenLogo";
+import { AddressQrModal } from "../components/AddressQrModal";
 
 export function WalletScreen({ wallet, setWallet, navigate }: { wallet: string; setWallet: (a: string) => void; navigate: (s: Screen) => void }) {
   const [state, setState] = useState<any>(null);
@@ -12,6 +13,8 @@ export function WalletScreen({ wallet, setWallet, navigate }: { wallet: string; 
   const [loading, setLoading] = useState(true);
   const [addrInput, setAddrInput] = useState("");
   const [selectedTokenIndex, setSelectedTokenIndex] = useState<number | null>(null);
+  const [showQrModal, setShowQrModal] = useState<boolean>(false);
+  const [addressCopied, setAddressCopied] = useState<boolean>(false);
 
   const load = async (w: string) => {
     setLoading(true);
@@ -86,6 +89,67 @@ export function WalletScreen({ wallet, setWallet, navigate }: { wallet: string; 
         </div>
         <div style={{ height: 12 }} />
         <div className="mono small" style={{ color: "var(--cyan)", wordBreak: "break-all" }}>{wallet}</div>
+        <div style={{ height: 10 }} />
+        <div className="row gap" style={{ flexWrap: "wrap", alignItems: "center" }}>
+          <button
+            className="btn"
+            style={{
+              padding: "7px 14px",
+              fontSize: 12,
+              fontWeight: 700,
+              background: "rgba(0, 240, 255, 0.15)",
+              border: "1px solid var(--cyan)",
+              color: "var(--cyan)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              cursor: "pointer"
+            }}
+            onClick={() => setShowQrModal(true)}
+            data-testid="btn-show-qr-code"
+          >
+            <span>📱</span> Show QR Code
+          </button>
+          <button
+            className="btn"
+            style={{
+              padding: "7px 12px",
+              fontSize: 12,
+              background: addressCopied ? "rgba(16, 185, 129, 0.2)" : "var(--surface)",
+              border: `1px solid ${addressCopied ? "var(--emerald)" : "var(--border)"}`,
+              color: addressCopied ? "var(--emerald)" : "var(--fg)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              cursor: "pointer"
+            }}
+            onClick={() => {
+              navigator.clipboard?.writeText(wallet);
+              setAddressCopied(true);
+              setTimeout(() => setAddressCopied(false), 2000);
+            }}
+          >
+            <span>{addressCopied ? "✓" : "📋"}</span> {addressCopied ? "Copied" : "Copy Address"}
+          </button>
+          <a
+            href={`https://basescan.org/address/${wallet}`}
+            target="_blank"
+            rel="noreferrer"
+            className="btn"
+            style={{
+              padding: "7px 12px",
+              fontSize: 12,
+              background: "var(--surface)",
+              color: "var(--muted)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              textDecoration: "none"
+            }}
+          >
+            <span>🔍</span> Basescan
+          </a>
+        </div>
         <div style={{ height: 12 }} />
         <div className="row gap">
           <input className="input" placeholder="0x… address" value={addrInput} onChange={(e) => setAddrInput(e.target.value)} />
@@ -355,6 +419,13 @@ export function WalletScreen({ wallet, setWallet, navigate }: { wallet: string; 
           ))}
         </>
       )}
+
+      {/* Public Address QR Code Modal */}
+      <AddressQrModal
+        address={wallet}
+        isOpen={showQrModal}
+        onClose={() => setShowQrModal(false)}
+      />
     </div>
   );
 }

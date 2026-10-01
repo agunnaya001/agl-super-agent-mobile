@@ -22,3 +22,10 @@ export type {
   GovernanceDiagnosticResult,
   UseGovernanceDiagnosticOptions,
 } from "./useGovernanceDiagnostic";
+
+export {
+  GOVERNANCE_CONTRACTS,
+  BASE_RPC_URLS,
+  getBasescanUrl,
+  truncateAddress,
+} from "./contracts";

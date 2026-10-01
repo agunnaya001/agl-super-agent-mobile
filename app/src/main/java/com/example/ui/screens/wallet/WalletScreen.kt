@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
@@ -200,6 +201,7 @@ fun WalletScreen(
                     clipboardManager.setText(AnnotatedString(activeWalletAddress))
                     onShowSnackbar("Address copied to clipboard")
                 },
+                onShowQrCode = onOpenReceiveModal,
                 onRefresh = onRefresh
             )
         }
@@ -503,6 +505,7 @@ fun WalletTopConnectionBar(
     onLockWallet: () -> Unit,
     onToggleBiometricLock: (Boolean) -> Unit,
     onCopy: () -> Unit,
+    onShowQrCode: () -> Unit = {},
     onRefresh: () -> Unit
 ) {
     Column(
@@ -650,6 +653,26 @@ fun WalletTopConnectionBar(
             }
 
             Button(
+                onClick = onShowQrCode,
+                modifier = Modifier
+                    .height(36.dp)
+                    .testTag("btn_show_qr_code"),
+                colors = ButtonDefaults.buttonColors(containerColor = DarkCardElevated),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BaseCyan.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.QrCode,
+                    contentDescription = "Show QR Code",
+                    modifier = Modifier.size(15.dp),
+                    tint = BaseCyan
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("QR", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = BaseCyan)
+            }
+
+            Button(
                 onClick = onConnectWalletClick,
                 modifier = Modifier
                     .height(36.dp)
@@ -687,6 +710,116 @@ fun WalletTopConnectionBar(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             color = if (isSelected) Color.White else TextSecondary
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun WalletBiometricSecurityCard(
+    isBiometricEnabled: Boolean,
+    isUnlocked: Boolean,
+    activeWallet: WalletAccountEntity?,
+    hasVaultAccounts: Boolean,
+    onViewPrivateKey: () -> Unit,
+    onUnlockWithBiometrics: () -> Unit,
+    onLockWallet: () -> Unit
+) {
+    GlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("wallet_biometric_security_card"),
+        cornerRadius = 16.dp,
+        backgroundColor = DarkCard,
+        borderColor = if (isUnlocked) NeonEmerald.copy(alpha = 0.4f) else AmberWarning.copy(alpha = 0.35f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(if (isUnlocked) NeonEmerald.copy(alpha = 0.2f) else AmberWarning.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isUnlocked) Icons.Default.LockOpen else Icons.Default.Fingerprint,
+                            contentDescription = "Biometric Vault",
+                            tint = if (isUnlocked) NeonEmerald else AmberWarning,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Hardware Security Vault",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = if (isUnlocked) "Authenticated • Key Decrypted" else "Biometrics Active • Hardware Keystore Encrypted",
+                            fontSize = 10.sp,
+                            color = if (isUnlocked) NeonEmerald else TextSecondary
+                        )
+                    }
+                }
+
+                if (isBiometricEnabled) {
+                    Button(
+                        onClick = if (isUnlocked) onLockWallet else onUnlockWithBiometrics,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isUnlocked) DarkBorder else BaseBlue
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(30.dp)
+                    ) {
+                        Text(
+                            text = if (isUnlocked) "Lock Vault" else "Unlock",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            if (hasVaultAccounts && activeWallet?.encryptedPrivateKey != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f))
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Encrypted Private Key Stored",
+                        fontSize = 11.sp,
+                        color = TextSecondary
+                    )
+
+                    Button(
+                        onClick = onViewPrivateKey,
+                        colors = ButtonDefaults.buttonColors(containerColor = DarkCardElevated),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BaseCyan.copy(alpha = 0.4f)),
+                        shape = RoundedCornerShape(6.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.height(28.dp).testTag("btn_view_private_key")
+                    ) {
+                        Text("View Key", fontSize = 10.sp, color = BaseCyan, fontWeight = FontWeight.Bold)
                     }
                 }
             }
