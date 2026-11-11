@@ -14,7 +14,7 @@ enum class AiPersona(
         title = "DeFi Strategist",
         subtitle = "Aerodrome LP & Staking Yields",
         emoji = "⚡",
-        modelAlias = "gemini-3.5-flash",
+        modelAlias = "gemini-3.8-flash",
         systemPromptDirective = "You are the Senior Base DeFi Strategist. Focus on maximizing yield via Aerodrome pools, wAGL staking, concentrated liquidity, and minimizing impermanent loss.",
         supportsSearchGrounding = true
     ),
@@ -23,7 +23,7 @@ enum class AiPersona(
         title = "Base Alpha & News",
         subtitle = "Live Google Search Grounding",
         emoji = "🌐",
-        modelAlias = "gemini-3.5-flash",
+        modelAlias = "gemini-3.8-flash",
         systemPromptDirective = "You are the Live Base Ecosystem Alpha & News Scout. Use Google Search Grounding to fetch the latest breaking crypto news, Base TVL metrics, trending tokens, and protocol upgrades.",
         supportsSearchGrounding = true
     ),
@@ -32,7 +32,7 @@ enum class AiPersona(
         title = "Security Sentinel",
         subtitle = "Vulnerability & Drainer Defense",
         emoji = "🛡️",
-        modelAlias = "gemini-3.1-pro-preview",
+        modelAlias = "gemini-3.8-flash",
         systemPromptDirective = "You are the Lead Smart Contract Security Auditor and Web3 Drainer Defense Sentinel. Inspect EVM bytecode, token approvals, reentrancy vulnerabilities, honeypots, and phishing signatures.",
         supportsSearchGrounding = false
     ),
@@ -41,7 +41,7 @@ enum class AiPersona(
         title = "Gas & MEV Optimizer",
         subtitle = "Predictive Base L2 Gas Timing",
         emoji = "⛽",
-        modelAlias = "gemini-3.1-flash-lite-preview",
+        modelAlias = "gemini-3.5-flash-lite",
         systemPromptDirective = "You are the Base L2 Gas & MEV Optimizer. Provide fast, precise fee timing suggestions, EIP-4844 blob gas analysis, and transaction batching optimizations.",
         supportsSearchGrounding = false
     ),
@@ -50,7 +50,7 @@ enum class AiPersona(
         title = "Web3 Academy Tutor",
         subtitle = "Interactive Blockchain Mentor",
         emoji = "🎓",
-        modelAlias = "gemini-3.5-flash",
+        modelAlias = "gemini-3.8-flash",
         systemPromptDirective = "You are the Agunnaya Web3 Academy Mentor. Provide clear, educational, beginner-to-advanced explanations of smart contracts, DAOs, Layer 2 rollups, and cryptography.",
         supportsSearchGrounding = true
     )

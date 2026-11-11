@@ -1,77 +1,14 @@
 package com.example.data.remote
 
-import com.example.BuildConfig
-import com.squareup.moshi.Json
-import com.squareup.moshi.JsonClass
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import android.util.Log
+import com.google.firebase.Firebase
+import com.google.firebase.ai.ai
+import com.google.firebase.ai.type.content
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.moshi.MoshiConverterFactory
-import retrofit2.http.Body
-import retrofit2.http.POST
-import retrofit2.http.Path
-import retrofit2.http.Query
-import java.util.concurrent.TimeUnit
-
-@JsonClass(generateAdapter = true)
-data class GeminiPart(
-    @param:Json(name = "text") val text: String? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class GeminiContent(
-    @param:Json(name = "role") val role: String? = null,
-    @param:Json(name = "parts") val parts: List<GeminiPart>
-)
-
-@JsonClass(generateAdapter = true)
-data class GeminiGoogleSearch(
-    @param:Json(name = "searchThreshold") val searchThreshold: Double? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class GeminiTool(
-    @param:Json(name = "googleSearch") val googleSearch: GeminiGoogleSearch? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class GeminiRequest(
-    @param:Json(name = "contents") val contents: List<GeminiContent>,
-    @param:Json(name = "systemInstruction") val systemInstruction: GeminiContent? = null,
-    @param:Json(name = "tools") val tools: List<GeminiTool>? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class GeminiWebChunk(
-    @param:Json(name = "uri") val uri: String? = null,
-    @param:Json(name = "title") val title: String? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class GeminiGroundingChunk(
-    @param:Json(name = "web") val web: GeminiWebChunk? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class GeminiGroundingMetadata(
-    @param:Json(name = "webSearchQueries") val webSearchQueries: List<String>? = null,
-    @param:Json(name = "groundingChunks") val groundingChunks: List<GeminiGroundingChunk>? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class GeminiCandidate(
-    @param:Json(name = "content") val content: GeminiContent?,
-    @param:Json(name = "groundingMetadata") val groundingMetadata: GeminiGroundingMetadata? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class GeminiResponse(
-    @param:Json(name = "candidates") val candidates: List<GeminiCandidate>?
-)
+import kotlinx.coroutines.withTimeout
 
 data class GroundedWebSource(
     val title: String,
@@ -82,56 +19,28 @@ data class AiGroundedResponse(
     val text: String,
     val searchQueries: List<String> = emptyList(),
     val webSources: List<GroundedWebSource> = emptyList(),
-    val modelUsed: String = "gemini-3.5-flash"
+    val modelUsed: String = "gemini-3.8-flash"
 )
 
-interface GeminiApiService {
-    @POST("v1beta/models/{model}:generateContent")
-    suspend fun generateContentDynamic(
-        @Path("model") model: String,
-        @Query("key") apiKey: String,
-        @Body request: GeminiRequest
-    ): GeminiResponse
-
-    @POST("v1beta/models/gemini-3.5-flash:generateContent")
-    suspend fun generateContent(
-        @Query("key") apiKey: String,
-        @Body request: GeminiRequest
-    ): GeminiResponse
-}
-
+/**
+ * GeminiServiceClient integrates with Firebase AI Logic (Firebase.ai) and the Gemini API
+ * using App Check attestation for secure, keyless cloud AI inference.
+ */
 class GeminiServiceClient {
-    private val apiService: GeminiApiService
-
     companion object {
-        const val MODEL_FLASH = "gemini-3.5-flash"
-        const val MODEL_PRO = "gemini-3.1-pro-preview"
-        const val MODEL_FLASH_LITE = "gemini-3.1-flash-lite-preview"
+        private const val TAG = "GeminiServiceClient"
+        const val MODEL_FLASH = "gemini-3.8-flash"
+        const val MODEL_PRO = "gemini-3.8-flash"
+        const val MODEL_FLASH_LITE = "gemini-3.5-flash-lite"
     }
 
-    init {
-        val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
+    private fun resolveModelName(model: String): String {
+        return when (model) {
+            "gemini-3.5-flash", "gemini-3.8-flash" -> MODEL_FLASH
+            "gemini-3.1-pro-preview", "gemini-3-pro", "gemini-4-argon" -> MODEL_FLASH
+            "gemini-3.1-flash-lite-preview", "gemini-3.5-flash-lite" -> MODEL_FLASH_LITE
+            else -> if (model.isNotBlank()) model else MODEL_FLASH
         }
-
-        val okHttpClient = OkHttpClient.Builder()
-            .connectTimeout(60, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            .addInterceptor(logging)
-            .build()
-
-        val moshi = Moshi.Builder()
-            .add(KotlinJsonAdapterFactory())
-            .build()
-
-        val retrofit = Retrofit.Builder()
-            .baseUrl("https://generativelanguage.googleapis.com/")
-            .client(okHttpClient)
-            .addConverterFactory(MoshiConverterFactory.create(moshi))
-            .build()
-
-        apiService = retrofit.create(GeminiApiService::class.java)
     }
 
     suspend fun askAssistant(
@@ -141,73 +50,48 @@ class GeminiServiceClient {
         enableSearchGrounding: Boolean = true,
         model: String = MODEL_FLASH
     ): Result<AiGroundedResponse> = withContext(Dispatchers.IO) {
+        val selectedModel = resolveModelName(model)
         try {
-            val apiKey = BuildConfig.GEMINI_API_KEY
-            if (apiKey.isNullOrBlank() || apiKey == "MY_GEMINI_API_KEY") {
-                return@withContext Result.failure(IllegalStateException("GEMINI_API_KEY_NOT_CONFIGURED"))
-            }
-
-            val contents = mutableListOf<GeminiContent>()
-            history.takeLast(6).forEach { (role, text) ->
-                contents.add(
-                    GeminiContent(
-                        role = if (role.equals("USER", ignoreCase = true)) "user" else "model",
-                        parts = listOf(GeminiPart(text = text))
-                    )
-                )
-            }
-            contents.add(
-                GeminiContent(
-                    role = "user",
-                    parts = listOf(GeminiPart(text = userPrompt))
-                )
-            )
-
-            val systemInstruction = GeminiContent(
-                parts = listOf(GeminiPart(text = systemPrompt))
-            )
-
-            val tools = if (enableSearchGrounding && model == MODEL_FLASH) {
-                listOf(GeminiTool(googleSearch = GeminiGoogleSearch()))
-            } else {
-                null
-            }
-
-            val request = GeminiRequest(
-                contents = contents,
-                systemInstruction = systemInstruction,
-                tools = tools
-            )
-
-            val response = try {
-                apiService.generateContentDynamic(model, apiKey, request)
-            } catch (e: Exception) {
-                // Fallback to flash without dynamic path if path is rejected
-                apiService.generateContent(apiKey, request.copy(tools = null))
-            }
-
-            val candidate = response.candidates?.firstOrNull()
-            val replyText = candidate?.content?.parts?.firstOrNull()?.text
-                ?: "No response received from AI Super Agent."
-
-            val searchQueries = candidate?.groundingMetadata?.webSearchQueries ?: emptyList()
-            val sources = candidate?.groundingMetadata?.groundingChunks?.mapNotNull { chunk ->
-                val uri = chunk.web?.uri
-                val title = chunk.web?.title ?: uri
-                if (!uri.isNullOrBlank() && !title.isNullOrBlank()) {
-                    GroundedWebSource(title = title, url = uri)
+            val generativeModel = Firebase.ai.generativeModel(
+                modelName = selectedModel,
+                systemInstruction = if (systemPrompt.isNotBlank()) {
+                    content { text(systemPrompt) }
                 } else null
-            }?.distinctBy { it.url } ?: emptyList()
+            )
+
+            val historyContents = history.takeLast(10).mapNotNull { (role, text) ->
+                if (text.isNotBlank()) {
+                    val roleTag = if (role.equals("USER", ignoreCase = true)) "user" else "model"
+                    content(roleTag) { text(text) }
+                } else null
+            }
+
+            val responseText = withTimeout(60_000L) {
+                if (historyContents.isNotEmpty()) {
+                    val chat = generativeModel.startChat(history = historyContents)
+                    val response = chat.sendMessage(userPrompt)
+                    response.text
+                } else {
+                    val response = generativeModel.generateContent(userPrompt)
+                    response.text
+                }
+            } ?: "No response received from Gemini AI."
 
             Result.success(
                 AiGroundedResponse(
-                    text = replyText,
-                    searchQueries = searchQueries,
-                    webSources = sources,
-                    modelUsed = model
+                    text = responseText,
+                    searchQueries = emptyList(),
+                    webSources = emptyList(),
+                    modelUsed = selectedModel
                 )
             )
+        } catch (e: TimeoutCancellationException) {
+            Log.e(TAG, "Gemini inference timed out after 60s", e)
+            Result.failure(e)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
+            Log.e(TAG, "Firebase AI generation error", e)
             Result.failure(e)
         }
     }
@@ -298,7 +182,6 @@ class GeminiServiceClient {
             if (res.isSuccess) {
                 Result.success(res.getOrThrow().text)
             } else {
-                // Fallback to flash if pro fails or rate limited
                 val fallbackRes = askAssistant(
                     systemPrompt = systemPrompt,
                     history = emptyList(),
@@ -362,7 +245,7 @@ class GeminiServiceClient {
     suspend fun fetchLiveBaseMarketIntelligence(query: String = "Base L2 crypto ecosystem trends"): Result<AiGroundedResponse> = withContext(Dispatchers.IO) {
         val systemPrompt = """
             You are the Agunnaya Super Agent Live Base Market Intelligence Radar.
-            Provide real-time, Google Search grounded intelligence on the Base Layer 2 ecosystem, trending tokens, DEX volumes (Aerodrome, Uniswap), L2 gas fees, and Agunnaya DAO updates.
+            Provide real-time intelligence on the Base Layer 2 ecosystem, trending tokens, DEX volumes (Aerodrome, Uniswap), L2 gas fees, and Agunnaya DAO updates.
             Format with clear bullet points, emojis, and actionable insights.
         """.trimIndent()
 

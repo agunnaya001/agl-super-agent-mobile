@@ -59,12 +59,14 @@ import com.example.ui.viewmodel.MainViewModel
 import com.example.ui.viewmodel.MainViewModelFactory
 import com.example.util.BiometricAuthManager
 import com.example.util.PriceAlertNotificationManager
+import com.example.util.configureAppCheck
 
 class MainActivity : FragmentActivity() {
     private lateinit var biometricAuthManager: BiometricAuthManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        configureAppCheck(this, intent)
         enableEdgeToEdge()
 
         biometricAuthManager = BiometricAuthManager(applicationContext)

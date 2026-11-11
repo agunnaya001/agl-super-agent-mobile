@@ -7,12 +7,14 @@ import { WalletScreen } from "./screens/Wallet";
 import { AIScreen } from "./screens/AI";
 import { QuestsScreen } from "./screens/Quests";
 import { ProfileScreen } from "./screens/Profile";
-import { StakingScreen, GovernanceScreen, TimelockScreen, DiagnosticsScreen, PriceAlertsScreen, AglTokenScreen, CreditsScreen, WaglScreen } from "./screens/Secondary";
+import { StakingScreen, TimelockScreen, DiagnosticsScreen, PriceAlertsScreen, AglTokenScreen, CreditsScreen, WaglScreen } from "./screens/Secondary";
+import { DaoGovernanceScreen } from "./dao";
 
 const NAV: { screen: Screen; label: string; icon: string }[] = [
   { screen: "HOME", label: "Home", icon: "🏠" },
   { screen: "DASHBOARD", label: "Monitor", icon: "📊" },
   { screen: "WALLET", label: "Wallet", icon: "👛" },
+  { screen: "DAO_GOVERNANCE", label: "DAO Governance", icon: "🏛️" },
   { screen: "AI", label: "AI Agent", icon: "🤖" },
   { screen: "QUESTS", label: "Quests", icon: "🏆" },
   { screen: "PROFILE", label: "Profile", icon: "👤" },
@@ -41,7 +43,7 @@ export function App() {
         {screen === "QUESTS" && <QuestsScreen />}
         {screen === "PROFILE" && <ProfileScreen wallet={wallet} navigate={navigate} />}
         {screen === "STAKING" && <StakingScreen />}
-        {screen === "GOVERNANCE" && <GovernanceScreen />}
+        {(screen === "GOVERNANCE" || screen === "DAO_GOVERNANCE") && <DaoGovernanceScreen />}
         {screen === "TIMELOCK" && <TimelockScreen />}
         {screen === "DIAGNOSTICS" && <DiagnosticsScreen />}
         {screen === "PRICE_ALERTS" && <PriceAlertsScreen />}
@@ -51,12 +53,15 @@ export function App() {
       </div>
 
       <nav className="bottomnav">
-        {NAV.map((n) => (
-          <button key={n.screen} className={`nav-item ${screen === n.screen ? "active" : ""}`} onClick={() => navigate(n.screen)}>
-            <span className="nav-icon">{n.icon}</span>
-            <span>{n.label}</span>
-          </button>
-        ))}
+        {NAV.map((n) => {
+          const isActive = screen === n.screen || (n.screen === "DAO_GOVERNANCE" && screen === "GOVERNANCE");
+          return (
+            <button key={n.screen} className={`nav-item ${isActive ? "active" : ""}`} onClick={() => navigate(n.screen)}>
+              <span className="nav-icon">{n.icon}</span>
+              <span>{n.label}</span>
+            </button>
+          );
+        })}
       </nav>
     </div>
   );

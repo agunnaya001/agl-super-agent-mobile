@@ -14,3 +14,6 @@ export * from "./hooks";
 
 // Reusable Governance UI components
 export * from "./components";
+
+// DAO Governance Screen
+export { DaoGovernanceScreen } from "./DaoGovernanceScreen";
