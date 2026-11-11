@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { tierPill } from "../ui";
 
-export function QuestsScreen() {
+export function QuestsScreen({ navigate }: { navigate?: (s: any) => void }) {
   const [tab, setTab] = useState<"MISSIONS" | "LEARNING" | "LEADERBOARD" | "REWARDS">("MISSIONS");
   return (
     <div>
@@ -12,7 +12,7 @@ export function QuestsScreen() {
         <button className={`tab ${tab === "LEADERBOARD" ? "active" : ""}`} onClick={() => setTab("LEADERBOARD")}>🏆 Leaderboard</button>
         <button className={`tab ${tab === "REWARDS" ? "active" : ""}`} onClick={() => setTab("REWARDS")}>🎁 Rewards</button>
       </div>
-      {tab === "MISSIONS" && <MissionsTab />}
+      {tab === "MISSIONS" && <MissionsTab navigate={navigate} />}
       {tab === "LEARNING" && <LearningTab />}
       {tab === "LEADERBOARD" && <LeaderboardTab />}
       {tab === "REWARDS" && <RewardsTab />}
@@ -20,13 +20,43 @@ export function QuestsScreen() {
   );
 }
 
-function MissionsTab() {
+function MissionsTab({ navigate }: { navigate?: (s: any) => void }) {
   const [quests, setQuests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => { api.getQuests().then((q) => { setQuests(q); setLoading(false); }).catch(() => setLoading(false)); }, []);
   if (loading) return <div className="center"><div className="loader" /></div>;
   return (
     <div>
+      {/* Featured GameFi Mission */}
+      {navigate && (
+        <div
+          className="card card-elev"
+          style={{
+            background: "linear-gradient(135deg, rgba(0, 82, 255, 0.25) 0%, rgba(0, 212, 255, 0.15) 100%)",
+            border: "1px solid rgba(0, 212, 255, 0.4)",
+            marginBottom: 14,
+          }}
+        >
+          <div className="row between">
+            <div className="row gap">
+              <span style={{ fontSize: 26 }}>🎮</span>
+              <div>
+                <div className="bold small" style={{ color: "#ffffff" }}>Cyber Sentinel: Mempool Defense</div>
+                <div className="tiny muted">60fps real-time action arcade · Defend smart contract nodes</div>
+              </div>
+            </div>
+            <span className="pill gold">+500 XP</span>
+          </div>
+          <div style={{ height: 10 }} />
+          <button
+            className="btn cyan"
+            style={{ fontWeight: 800, fontSize: 13, padding: "8px 16px" }}
+            onClick={() => navigate("GAME")}
+          >
+            Launch Cyber Sentinel Game ⚡
+          </button>
+        </div>
+      )}
       {quests.map((q) => (
         <div key={q.id} className="card">
           <div className="row between">

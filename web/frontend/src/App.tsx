@@ -9,12 +9,14 @@ import { QuestsScreen } from "./screens/Quests";
 import { ProfileScreen } from "./screens/Profile";
 import { StakingScreen, TimelockScreen, DiagnosticsScreen, PriceAlertsScreen, AglTokenScreen, CreditsScreen, WaglScreen } from "./screens/Secondary";
 import { DaoGovernanceScreen } from "./dao";
+import { CyberSentinelGame } from "./game";
 
 const NAV: { screen: Screen; label: string; icon: string }[] = [
   { screen: "HOME", label: "Home", icon: "🏠" },
   { screen: "DASHBOARD", label: "Monitor", icon: "📊" },
   { screen: "WALLET", label: "Wallet", icon: "👛" },
-  { screen: "DAO_GOVERNANCE", label: "DAO Governance", icon: "🏛️" },
+  { screen: "GAME", label: "Game", icon: "🎮" },
+  { screen: "DAO_GOVERNANCE", label: "Governance", icon: "🏛️" },
   { screen: "AI", label: "AI Agent", icon: "🤖" },
   { screen: "QUESTS", label: "Quests", icon: "🏆" },
   { screen: "PROFILE", label: "Profile", icon: "👤" },
@@ -24,6 +26,11 @@ export function App() {
   const [screen, setScreen] = useState<Screen>("HOME");
   const [wallet, setWallet] = useState(DEFAULT_WALLET);
   const navigate = useCallback((s: Screen) => setScreen(s), []);
+
+  // Full-viewport Game Shell: never render website navbars or footers during game
+  if (screen === "GAME") {
+    return <CyberSentinelGame onExit={() => setScreen("HOME")} />;
+  }
 
   return (
     <div className="app-shell">
@@ -40,7 +47,7 @@ export function App() {
         {screen === "DASHBOARD" && <DashboardScreen wallet={wallet} navigate={navigate} />}
         {screen === "WALLET" && <WalletScreen wallet={wallet} setWallet={setWallet} navigate={navigate} />}
         {screen === "AI" && <AIScreen />}
-        {screen === "QUESTS" && <QuestsScreen />}
+        {screen === "QUESTS" && <QuestsScreen navigate={navigate} />}
         {screen === "PROFILE" && <ProfileScreen wallet={wallet} navigate={navigate} />}
         {screen === "STAKING" && <StakingScreen />}
         {(screen === "GOVERNANCE" || screen === "DAO_GOVERNANCE") && <DaoGovernanceScreen />}

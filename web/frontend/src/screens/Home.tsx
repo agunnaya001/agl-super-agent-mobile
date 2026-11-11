@@ -98,6 +98,38 @@ export function HomeScreen({ wallet, navigate }: { wallet: string; navigate: (s:
         <button className="btn ghost" onClick={() => setShowWalkthrough(true)}>❓ Help & Tour</button>
       </div>
 
+      {/* Cyber Sentinel Arcade Game Feature Card */}
+      <div
+        className="card card-elev"
+        style={{
+          marginTop: 12,
+          background: "linear-gradient(135deg, rgba(0, 82, 255, 0.22) 0%, rgba(0, 212, 255, 0.12) 100%)",
+          border: "1px solid rgba(0, 212, 255, 0.4)",
+          cursor: "pointer",
+        }}
+        onClick={() => navigate("GAME")}
+      >
+        <div className="row between" style={{ alignItems: "center" }}>
+          <div className="row gap" style={{ alignItems: "center" }}>
+            <span style={{ fontSize: 26 }}>🎮</span>
+            <div>
+              <div className="bold small" style={{ color: "#ffffff" }}>Cyber Sentinel: Base Defense</div>
+              <div className="tiny muted">60fps action arcade · Defend Base nodes & earn AGL shards</div>
+            </div>
+          </div>
+          <button
+            className="btn cyan"
+            style={{ width: "auto", fontSize: 11, padding: "6px 14px", fontWeight: 800 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate("GAME");
+            }}
+          >
+            PLAY NOW ⚡
+          </button>
+        </div>
+      </div>
+
       {/* Ecosystem stats */}
       {stats && (
         <>
